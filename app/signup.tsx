@@ -7,6 +7,8 @@ import {
   Alert,
   TouchableOpacity,
   Keyboard,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { auth, db } from "../utils/firebase";
@@ -24,18 +26,24 @@ const SignUp = () => {
   const [password, setPassword] = useState("");
   const [isPasswordVisible, setIsPasswordVisible] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [errorMessage, setErrorMessage] = useState<string>("");
   const router = useRouter();
 
-  const handleLogin = async () => {
+  const isDisabled = !email || !password || !name || isLoading;
+
+  const handleSignUp = async () => {
     Keyboard.dismiss();
-    setIsLoading(true);
-    const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      Alert.alert("Invalid email", "Please re-enter email");
+      Alert.alert("Invalid Email", "Please enter a valid email address.");
       return;
     }
+    if (!name || !email || !password) {
+      Alert.alert("Missing Fields", "Please fill out all fields.");
+      return;
+    }
+
     try {
+      setIsLoading(true);
       const user = await createUserWithEmailAndPassword(auth, email, password);
 
       await setDoc(doc(db, "users", user.user.uid), {
@@ -45,7 +53,8 @@ const SignUp = () => {
         profile: "",
       });
 
-      toast.show({ description: "Sign up successfully" });
+      router.replace("/(tabs)/Home");
+      toast.show({ description: "Signed up successfully!" });
     } catch (error) {
       const err = handleApiError(error);
       toast.show({ description: err });
@@ -54,97 +63,80 @@ const SignUp = () => {
     }
   };
 
-  const togglePasswordVisibility = () => {
-    setIsPasswordVisible(!isPasswordVisible);
-  };
-
   return (
-    <View style={styles.container}>
-      <View>
-        <Text style={styles.title}>Sign Up</Text>
-      </View>
-      <View>
-        <Text style={styles.titleLogin}>Please signup to continue.</Text>
-      </View>
-      <View style={styles.inputContainer}>
-        <View style={styles.inputWrapper}>
-          <FontAwesome
-            name="user"
-            size={20}
-            color="#9d9d9d"
-            style={styles.icon}
-          />
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+    >
+      <View style={styles.card}>
+        <Text style={styles.title}>Create Account</Text>
+        <Text style={styles.subtitle}>Sign up to get started</Text>
 
+        <View style={styles.inputWrapper}>
+          <FontAwesome name="user" size={20} color="#9ca3af" />
           <TextInput
-            placeholder="Name"
+            placeholder="Full Name"
             value={name}
             onChangeText={setName}
-            style={styles.textInput}
+            style={styles.input}
+            placeholderTextColor="#9ca3af"
           />
         </View>
+
         <View style={styles.inputWrapper}>
-          <MaterialIcons
-            name="mail"
-            size={20}
-            color="#9d9d9d"
-            style={styles.icon}
-          />
+          <MaterialIcons name="mail" size={20} color="#9ca3af" />
           <TextInput
             placeholder="Email"
+            keyboardType="email-address"
             value={email}
             onChangeText={setEmail}
-            style={styles.textInput}
+            style={styles.input}
+            placeholderTextColor="#9ca3af"
           />
         </View>
+
         <View style={styles.inputWrapper}>
-          <MaterialIcons
-            name="lock"
-            size={20}
-            color="#9d9d9d"
-            style={styles.icon}
-          />
+          <MaterialIcons name="lock" size={20} color="#9ca3af" />
           <TextInput
             placeholder="Password"
+            secureTextEntry={!isPasswordVisible}
             value={password}
             onChangeText={setPassword}
-            onSubmitEditing={handleLogin}
-            secureTextEntry={!isPasswordVisible} // Bổ sung thuộc tính secureTextEntry để ẩn mật khẩu
-            style={styles.textInput}
+            onSubmitEditing={handleSignUp}
+            style={styles.input}
+            placeholderTextColor="#9ca3af"
           />
-          <TouchableOpacity onPress={togglePasswordVisibility}>
+          <TouchableOpacity
+            onPress={() => setIsPasswordVisible((prev) => !prev)}
+          >
             <MaterialIcons
               name={isPasswordVisible ? "visibility" : "visibility-off"}
               size={20}
-              color="#9d9d9d"
+              color="#9ca3af"
             />
           </TouchableOpacity>
         </View>
-        <View style={styles.registerContainer}>
-          <TouchableOpacity>
-            <Text style={styles.registerText}>
-              Already have an account?{" "}
-              <Text
-                onPress={() => router.replace("/login")}
-                style={styles.registerLink}
-              >
-                Login
-              </Text>
-            </Text>
-          </TouchableOpacity>
-        </View>
-        <TouchableOpacity disabled={isLoading} onPress={handleLogin}>
-          <View style={styles.loginButton}>
-            <Text style={styles.loginButtonText}>
-              {isLoading ? <Spinner color="#fff" /> : "Sign Up"}
-            </Text>
-          </View>
+
+        <TouchableOpacity
+          style={[styles.button, isDisabled && styles.disabledButton]}
+          onPress={handleSignUp}
+          disabled={isDisabled}
+        >
+          {isLoading ? (
+            <Spinner color="#fff" />
+          ) : (
+            <Text style={styles.buttonText}>Sign Up</Text>
+          )}
         </TouchableOpacity>
 
-        <View style={styles.errorMessageContainer}>
-          <Text style={styles.errorMessage}>{errorMessage}</Text>
-        </View>
+        <Text style={styles.loginText}>
+          Already have an account?{" "}
+          <Text style={styles.link} onPress={() => router.replace("/login")}>
+            Log in
+          </Text>
+        </Text>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 };
 
@@ -154,88 +146,70 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#fff",
-    alignItems: "center",
     justifyContent: "center",
+    alignItems: "center",
+    padding: 16,
+  },
+  card: {
+    width: "100%",
+    maxWidth: 400,
+    padding: 24,
+    borderRadius: 16,
+    backgroundColor: "#fff",
   },
   title: {
-    color: "#5F5F5F",
-    fontSize: 25,
-    fontWeight: "600",
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#ec4899",
+    textAlign: "center",
+    marginBottom: 8,
   },
-  titleLogin: {
-    color: "#5F5F5F",
-    fontSize: 15,
-    marginTop: 10,
-  },
-  inputContainer: {
-    width: "80%",
-    marginTop: 20,
-    gap: 20,
+  subtitle: {
+    fontSize: 16,
+    color: "#475569",
+    textAlign: "center",
+    marginBottom: 30,
   },
   inputWrapper: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#fff",
-    paddingHorizontal: 10,
-    borderWidth: 0.2,
-    borderRadius: 5,
+    backgroundColor: "#f9fafb",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    height: 50,
+    gap: 10,
+    marginBottom: 16,
   },
-  textInput: {
+  input: {
     flex: 1,
+    fontSize: 16,
+    color: "#475569",
+  },
+  button: {
+    backgroundColor: "#ec4899",
     paddingVertical: 15,
-    paddingHorizontal: 10,
+    borderRadius: 12,
+    alignItems: "center",
+    marginTop: 10,
   },
-  icon: {
-    marginRight: 10,
+  disabledButton: {
+    backgroundColor: "#d1d5db",
   },
-  registerContainer: {
-    justifyContent: "flex-end",
-    alignItems: "flex-end",
+  buttonText: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 16,
   },
-  registerText: {
-    color: "#5F5F5F",
+  loginText: {
+    textAlign: "center",
+    marginTop: 20,
+    color: "#475569",
+    fontSize: 14,
   },
-  registerLink: {
-    color: "#456FE8",
+  link: {
+    color: "#ec4899",
     fontWeight: "600",
   },
-  loginButton: {
-    backgroundColor: "#456FE8",
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    borderRadius: 5,
-    alignItems: "center",
-  },
-  loginButtonText: {
-    color: "#fff",
-    fontSize: 15,
-  },
-  errorMessageContainer: {
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  errorMessage: {
-    color: "red",
-  },
 });
-//  <View style={{ height: "100%" }}>
-//                 {receivedQuotes?.data.map((item, i) => (
-//                   <View key={i} style={styles.quoteBox}>
-//                     <Text style={styles.quoteText}>
-//                       {formatCustomDate(item.date)}
-//                     </Text>
-//                     {item?.quotes?.map((quote, index) => (
-//                       <View style={styles.quoteItem} key={index}>
-//                         <Text style={styles.quoteText}>{quote.text}</Text>
-
-//                         <Text style={styles.quoteMeta}>
-//                           From: {quote.senderName} •{" "}
-//                           {formatCustomDate(
-//                             quote?.timestamp?.seconds.toString()
-//                           )}
-//                         </Text>
-//                       </View>
-//                     ))}
-//                   </View>
-//                 ))}
-//               </View>

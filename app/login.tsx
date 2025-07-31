@@ -3,13 +3,11 @@ import {
   View,
   Text,
   TextInput,
-  Button,
   StyleSheet,
-  Alert,
   TouchableOpacity,
   Keyboard,
 } from "react-native";
-import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
+import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "../utils/firebase";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useRouter } from "expo-router";
@@ -19,17 +17,19 @@ import { Spinner, useToast } from "native-base";
 const LoginScreen = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [isPasswordVisible, setIsPasswordVisible] = useState<boolean>(false);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [errorMessage, setErrorMessage] = useState<string>("");
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
   const router = useRouter();
   const toast = useToast();
 
+  const isDisabled = !email || !password || isLoading;
+
   const handleLogin = async () => {
     Keyboard.dismiss();
-    const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      Alert.alert("Invalid email", "Please re-enter email");
+      toast.show({ description: "Please enter a valid email address." });
       return;
     }
     try {
@@ -44,78 +44,69 @@ const LoginScreen = () => {
     }
   };
 
-  const togglePasswordVisibility = () => {
-    setIsPasswordVisible(!isPasswordVisible);
-  };
-
   return (
     <View style={styles.container}>
-      <View>
-        <Text style={styles.title}>Login</Text>
-      </View>
-      <View>
-        <Text style={styles.titleLogin}>Please login to continue.</Text>
-      </View>
+      <Text style={styles.title}>Welcome Back</Text>
+      <Text style={styles.subtitle}>Please log in to continue</Text>
+
       <View style={styles.inputContainer}>
         <View style={styles.inputWrapper}>
-          <MaterialIcons
-            name="mail"
-            size={20}
-            color="#9d9d9d"
-            style={styles.icon}
-          />
+          <MaterialIcons name="mail" size={20} color="#9ca3af" />
           <TextInput
             placeholder="Email"
             value={email}
+            keyboardType="email-address"
             onChangeText={setEmail}
-            style={styles.textInput}
+            style={styles.input}
+            placeholderTextColor="#9ca3af"
           />
         </View>
         <View style={styles.inputWrapper}>
-          <MaterialIcons
-            name="lock"
-            size={20}
-            color="#9d9d9d"
-            style={styles.icon}
-          />
+          <MaterialIcons name="lock" size={20} color="#9ca3af" />
           <TextInput
             placeholder="Password"
             value={password}
             onChangeText={setPassword}
-            onSubmitEditing={handleLogin}
-            secureTextEntry={!isPasswordVisible} // Bổ sung thuộc tính secureTextEntry để ẩn mật khẩu
-            style={styles.textInput}
+            style={styles.input}
+            secureTextEntry={!isPasswordVisible}
+            placeholderTextColor="#9ca3af"
           />
-          <TouchableOpacity onPress={togglePasswordVisibility}>
+          <TouchableOpacity
+            onPress={() => setIsPasswordVisible((prev) => !prev)}
+          >
             <MaterialIcons
               name={isPasswordVisible ? "visibility" : "visibility-off"}
               size={20}
-              color="#9d9d9d"
+              color="#9ca3af"
             />
           </TouchableOpacity>
         </View>
-        <View style={styles.registerContainer}>
-          <TouchableOpacity>
-            <Text
-              onPress={() => router.push("/signup")}
-              style={styles.registerText}
-            >
-              Don’t have an account?{" "}
-              <Text style={styles.registerLink}>Sign Up</Text>
-            </Text>
-          </TouchableOpacity>
-        </View>
-        <TouchableOpacity onPress={handleLogin}>
-          <View style={styles.loginButton}>
-            <Text style={styles.loginButtonText}>
-              {isLoading ? <Spinner color="#fff" /> : "Login"}
-            </Text>
-          </View>
+
+        <TouchableOpacity
+          onPress={handleLogin}
+          style={[styles.loginButton, isDisabled && styles.loginButtonDisabled]}
+          disabled={isDisabled}
+        >
+          {isLoading ? (
+            <Spinner color="#fff" />
+          ) : (
+            <Text style={styles.loginButtonText}>Login</Text>
+          )}
         </TouchableOpacity>
 
-        <View style={styles.errorMessageContainer}>
-          <Text style={styles.errorMessage}>{errorMessage}</Text>
-        </View>
+        <TouchableOpacity
+          onPress={() => router.push("/signup")}
+          style={styles.signupContainer}
+        >
+          <Text style={styles.signupText}>
+            Don’t have an account?{" "}
+            <Text style={styles.signupLink}>Sign Up</Text>
+          </Text>
+        </TouchableOpacity>
+
+        {errorMessage ? (
+          <Text style={styles.errorText}>{errorMessage}</Text>
+        ) : null}
       </View>
     </View>
   );
@@ -127,67 +118,71 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#fff",
-    alignItems: "center",
+    paddingHorizontal: 30,
     justifyContent: "center",
   },
   title: {
-    color: "#5F5F5F",
-    fontSize: 25,
-    fontWeight: "600",
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#ec4899",
+    textAlign: "center",
+    marginBottom: 8,
   },
-  titleLogin: {
-    color: "#5F5F5F",
-    fontSize: 15,
-    marginTop: 10,
+  subtitle: {
+    fontSize: 16,
+    color: "#475569",
+    textAlign: "center",
+    marginBottom: 30,
   },
   inputContainer: {
-    width: "80%",
-    marginTop: 20,
     gap: 20,
   },
   inputWrapper: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#fff",
-    paddingHorizontal: 10,
-    borderWidth: 0.2,
-    borderRadius: 5,
+    backgroundColor: "#f9fafb",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    height: 50,
+    gap: 10,
   },
-  textInput: {
+  input: {
     flex: 1,
-    paddingVertical: 15,
-    paddingHorizontal: 10,
-  },
-  icon: {
-    marginRight: 10,
-  },
-  registerContainer: {
-    justifyContent: "flex-end",
-    alignItems: "flex-end",
-  },
-  registerText: {
-    color: "#5F5F5F",
-  },
-  registerLink: {
-    color: "#456FE8",
-    fontWeight: "600",
+    fontSize: 16,
+    color: "#475569",
   },
   loginButton: {
-    backgroundColor: "#456FE8",
-    paddingHorizontal: 20,
+    backgroundColor: "#ec4899",
     paddingVertical: 15,
-    borderRadius: 5,
+    borderRadius: 12,
     alignItems: "center",
+    marginTop: 10,
+  },
+  loginButtonDisabled: {
+    backgroundColor: "#d1d5db", // Tailwind gray-300
   },
   loginButtonText: {
     color: "#fff",
-    fontSize: 15,
+    fontWeight: "600",
+    fontSize: 16,
   },
-  errorMessageContainer: {
-    justifyContent: "center",
+  signupContainer: {
+    marginTop: 15,
     alignItems: "center",
   },
-  errorMessage: {
-    color: "red",
+  signupText: {
+    color: "#475569",
+    fontSize: 14,
+  },
+  signupLink: {
+    color: "#ec4899",
+    fontWeight: "600",
+  },
+  errorText: {
+    marginTop: 10,
+    color: "#ef4444",
+    textAlign: "center",
   },
 });

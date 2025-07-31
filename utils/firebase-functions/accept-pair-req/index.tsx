@@ -15,10 +15,12 @@ export const acceptPairingRequest = async (
       transaction.update(fromUserRef, {
         isPaired: true,
         partnerId: toUserId,
+        score: 0,
       });
       transaction.update(toUserRef, {
         isPaired: true,
         partnerId: fromUserId,
+        score: 0,
       });
 
       // Delete the request

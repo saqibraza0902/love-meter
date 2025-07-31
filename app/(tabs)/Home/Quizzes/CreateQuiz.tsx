@@ -37,7 +37,7 @@ const CreateQuiz = () => {
   const toast = useToast();
   const router = useRouter();
   const [quizName, setQuizName] = useState("");
-  const [isImageQuiz, setIsImageQuiz] = useState(false);
+
   const [questions, setQuestions] = useState<Question[]>([
     {
       question: "",
@@ -185,9 +185,7 @@ const CreateQuiz = () => {
         questions.every(
           (q) =>
             q.question.trim() !== "" &&
-            (isImageQuiz
-              ? q.options.every((opt) => opt.image !== undefined)
-              : q.options.every((opt) => opt.text.trim() !== "")) &&
+            q.options.every((opt) => opt.text.trim() !== "" || opt.image) &&
             q.correctIndex !== null
         );
 
@@ -195,26 +193,20 @@ const CreateQuiz = () => {
         return toast.show({ description: "Please complete all the fields" });
       }
 
-      // Clean the data before saving
+      // Prepare cleaned questions
       const cleanedQuestions = questions.map((question) => ({
         ...question,
-        options: question.options.map((option) => {
-          // Remove undefined imageBase64 if not an image quiz
-          const cleanOption: Option = {
-            text: option.text || "", // Ensure text is never undefined
-            ...(isImageQuiz && option.image ? { image: option.image } : {}),
-          };
-          return cleanOption;
-        }),
+        options: question.options.map((option) => ({
+          text: option.text || "",
+          ...(option.image ? { image: option.image } : {}),
+        })),
       }));
 
-      // Prepare quiz data for Firestore
       const quizData = {
         name: quizName,
         creatorId: user?.id,
         users: [user?.id, partner.id],
         status: false,
-        isImageQuiz,
         questions: cleanedQuestions,
         createdAt: new Date(),
       };
@@ -230,40 +222,43 @@ const CreateQuiz = () => {
   };
 
   const renderOptionInput = (qIndex: number, optIndex: number, opt: Option) => {
+    const isPaidUser = user?.paid === true;
+
     return (
       <View style={styles.optionRow}>
         <Text style={styles.optionLabel}>
           {String.fromCharCode(65 + optIndex)}.
         </Text>
 
-        {isImageQuiz ? (
+        {opt.image ? (
+          <View style={styles.imageContainer}>
+            <Image source={{ uri: opt.image }} style={styles.optionImage} />
+            {isPaidUser && (
+              <TouchableOpacity
+                style={styles.removeImageButton}
+                onPress={() => removeImage(qIndex, optIndex)}
+              >
+                <Feather name="x" size={16} color="#ef4444" />
+              </TouchableOpacity>
+            )}
+          </View>
+        ) : (
           <>
-            {opt.image ? (
-              <View style={styles.imageContainer}>
-                <Image source={{ uri: opt.image }} style={styles.optionImage} />
-                <TouchableOpacity
-                  style={styles.removeImageButton}
-                  onPress={() => removeImage(qIndex, optIndex)}
-                >
-                  <Feather name="x" size={16} color="#ef4444" />
-                </TouchableOpacity>
-              </View>
-            ) : (
+            <TextInput
+              style={styles.optionInput}
+              value={opt.text}
+              onChangeText={(text) => updateOptionText(text, qIndex, optIndex)}
+              placeholder={`Option ${optIndex + 1}`}
+            />
+            {isPaidUser && (
               <TouchableOpacity
                 style={styles.uploadImageButton}
                 onPress={() => pickImage(qIndex, optIndex)}
               >
-                <Text style={styles.uploadImageText}>Upload Image</Text>
+                <Text style={styles.uploadImageText}>+ Img</Text>
               </TouchableOpacity>
             )}
           </>
-        ) : (
-          <TextInput
-            style={styles.optionInput}
-            value={opt.text}
-            onChangeText={(text) => updateOptionText(text, qIndex, optIndex)}
-            placeholder={`Option ${optIndex + 1}`}
-          />
         )}
 
         <TouchableOpacity
@@ -272,6 +267,7 @@ const CreateQuiz = () => {
         >
           <Feather name="x" size={18} color="#ef4444" />
         </TouchableOpacity>
+
         <Checkbox
           style={styles.checkbox}
           value={questions[qIndex].correctIndex === optIndex}
@@ -296,27 +292,6 @@ const CreateQuiz = () => {
         </View>
 
         {/* Image Quiz Toggle */}
-        <View style={styles.toggleContainer}>
-          <Text style={styles.toggleLabel}>Image Quiz</Text>
-          <Switch
-            value={isImageQuiz}
-            onValueChange={(value) => {
-              setIsImageQuiz(value);
-              // Reset all options when switching modes
-              setQuestions(
-                questions.map((q) => ({
-                  ...q,
-                  options: q.options.map((opt) => ({
-                    text: "",
-                    image: undefined,
-                  })),
-                }))
-              );
-            }}
-            trackColor={{ false: "#767577", true: "#81b0ff" }}
-            thumbColor={isImageQuiz ? "#3b82f6" : "#f4f3f4"}
-          />
-        </View>
 
         {questions.map((q, qIndex) => (
           <View key={qIndex} style={styles.questionBlock}>

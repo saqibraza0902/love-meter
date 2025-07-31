@@ -12,6 +12,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Animated,
+  Keyboard,
 } from "react-native";
 import {
   doc,
@@ -23,6 +24,8 @@ import {
   collection,
   where,
   getDocs,
+  orderBy,
+  runTransaction,
 } from "firebase/firestore";
 import { db, auth } from "@/utils/firebase";
 import { Ionicons } from "@expo/vector-icons";
@@ -35,9 +38,16 @@ import { serverTimestamp } from "firebase/database";
 import { setLastSent, setTimer } from "@/redux/slices/user-slice";
 import { format } from "date-fns";
 import { SafeAreaView } from "react-native-safe-area-context";
+// import { getLocales } from "expo-localization";
+import { useIsFocused } from "@react-navigation/native";
+// import FetchTime from "@/utils/fetch-global-time";
+import useFetchTime from "@/utils/fetch-global-time";
 const ChatScreen: React.FC = () => {
   const { partner, user, timer, lastSent } = useAppSelector((s) => s.user);
   const [loading, setLoading] = useState(true);
+  // const { timeData, error } = useFetchTime();
+  const scrollViewRef = useRef<ScrollView>(null);
+
   const [message, setMessage] = useState("");
   const [spinner, setSpinner] = useState(false);
   const [quotes, setQuote] = useState<IQuotes | null>(null);
@@ -49,12 +59,13 @@ const ChatScreen: React.FC = () => {
   const getUserScores = async () => {
     const userId = auth.currentUser?.uid;
     if (!userId || !user?.partnerId) return;
-    const quotesDoc = doc(db, "quotes", userId);
+    const quotesDoc = doc(db, "users", userId);
     const unsubscribeUserScores = onSnapshot(
       quotesDoc,
       (doc) => {
         if (doc.exists()) {
           const data = doc.data();
+
           setScore(data.score || 0);
         }
       },
@@ -94,6 +105,7 @@ const ChatScreen: React.FC = () => {
   //   return unsubscribeQuotes;
   // };
   // Calculates and sets the remaining cooldown time
+
   const calculateRemainingTime = (lastSent: number) => {
     if (!lastSent) return;
 
@@ -101,6 +113,60 @@ const ChatScreen: React.FC = () => {
     const timeDiff = Math.floor((now - lastSent) / 60000); // minutes passed
     const remaining = Math.max(0, 120 - timeDiff); // 2-hour cooldown
     dispatch(setTimer(remaining));
+  };
+
+  // Inside ChatScreen
+
+  const getQuotes = async () => {
+    if (!user || !partner) return;
+
+    const usersss = [user?.id, partner?.id];
+    const abc = query(
+      collection(db, "chats"),
+      where("users", "array-contains-any", usersss)
+    );
+
+    const unsubscribe = onSnapshot(abc, async (querySnapshot) => {
+      const docSnap = querySnapshot.docs[0];
+      if (!docSnap) return;
+
+      const quotesData = { id: docSnap.id, ...docSnap.data() } as IQuotes;
+      setQuote(quotesData);
+
+      // Mark unseen quotes as seen if user is the partner
+    });
+
+    return unsubscribe;
+  };
+
+  const getChatId = (userId1: string, userId2: string): string => {
+    return [userId1, userId2].sort().join("_");
+  };
+
+  const updateSeenQuotes = async () => {
+    if (!user?.id || !partner?.id) return;
+    console.log(getChatId(user.id, partner.id));
+
+    const docRef = doc(db, "chats", getChatId(user.id, partner.id));
+
+    const docSnap = await getDoc(docRef);
+    if (!docSnap.exists()) return console.log("It is not ");
+    console.log(docSnap.id);
+    const quoteData = docSnap.data() as IQuotes;
+
+    const updatedData = quoteData.data.map((entry) => {
+      const updatedQuotes = entry.quotes.map((quote) => {
+        // Mark as seen ONLY if it's not already seen AND it’s from the other user
+        if (!quote.seen && quote.name !== user.name) {
+          return { ...quote, seen: true };
+        }
+        return quote;
+      });
+
+      return { ...entry, quotes: updatedQuotes };
+    });
+
+    await updateDoc(docRef, { data: updatedData });
   };
 
   // Starts the countdown timer if applicable
@@ -114,81 +180,27 @@ const ChatScreen: React.FC = () => {
     return interval; // so we can clear it later
   };
   useEffect(() => {
-    if (user?.id && partner?.id) {
-      const unsubscribe = getQuotes();
-      return () => {
-        if (unsubscribe) unsubscribe();
-      };
-    }
+    const setup = async () => {
+      if (user?.id && partner?.id) {
+        const unsub = await getQuotes();
+        getUserScores();
+        await updateSeenQuotes(); // Only mark as seen when chat is opened
+        return unsub;
+      }
+    };
+
+    let unsubscribe: (() => void) | undefined;
+    setup().then((unsub) => {
+      unsubscribe = unsub;
+    });
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, [user, partner]);
 
-  const getQuotes = () => {
-    try {
-      const users = [user?.id, partner?.id].filter(Boolean); // ✅ Remove undefined values
-      console.log(user?.id, partner?.id);
-      if (users.length < 2) {
-        console.warn("User or partner ID missing. Cannot fetch quotes yet.");
-        return;
-      }
-
-      const querySnapshot = query(
-        collection(db, "chats"),
-        where("users", "array-contains-any", users)
-      );
-
-      const unsubscribe = onSnapshot(querySnapshot, async (querySnap) => {
-        const docSnap = querySnap.docs[0];
-        if (docSnap?.exists()) {
-          const quotesSnap = doc(db, "chats", docSnap.id);
-          const data = {
-            ...docSnap.data(),
-            id: docSnap.id,
-          } as IQuotes;
-          const quotesData = {
-            id: data.id,
-            data: data.data.reverse(),
-            score: data.score,
-            paid: data.paid,
-            users: data.users,
-          };
-
-          setQuote(quotesData);
-
-          // Mark unseen quotes as seen
-          const updatedQuotes = quotesData.data.map((day: any) => ({
-            ...day,
-            quotes: day.quotes.map((quote: any) => ({
-              ...quote,
-              seen: quote.name === user?.name ? quote.seen : true,
-            })),
-          }));
-
-          await updateDoc(quotesSnap, { data: updatedQuotes });
-
-          Animated.timing(fadeAnim, {
-            toValue: 1,
-            duration: 800,
-            useNativeDriver: true,
-          }).start();
-        }
-      });
-
-      return () => unsubscribe();
-    } catch (error) {
-      console.error("Error fetching quotes: ", error);
-    } finally {
-      setLoading(false);
-    }
-  };
   // Check quote cooldown and load received quotes
-  useEffect(() => {
-    setQuote(null);
-    const userId = auth.currentUser?.uid;
-    if (!userId || !user?.partnerId) return;
 
-    getQuotes();
-    getUserScores();
-  }, [auth.currentUser?.uid, user?.partnerId, partner?.id]);
   useEffect(() => {
     calculateRemainingTime(lastSent || 0);
   }, [lastSent]);
@@ -279,6 +291,7 @@ const ChatScreen: React.FC = () => {
   // };
 
   const sendQuote = async () => {
+    Keyboard.dismiss();
     if (!user || !partner) {
       Alert.alert("Cooldown", "You can only send a quote every 2 hours");
       return;
@@ -293,35 +306,29 @@ const ChatScreen: React.FC = () => {
       setSpinner(true);
       const now = Date();
       const formattedDate = formatCustomDate(now);
-      const usersss = [user.id, partner.id];
-      const abc = query(
-        collection(db, "chats"),
-        where("users", "array-contains-any", usersss)
-      );
-      const querySnapshot = await getDocs(abc);
-      const docSnap = querySnapshot.docs[0];
-      // console.log("I am here", docSnap);
       const wordCount = message.trim().split(/\s+/).length;
+      const chatId = getChatId(user.id, partner.id);
 
       const newQuote = {
         id: user.id,
         name: user.name || user.email,
         text: message,
         seen: false,
-        time: format(new Date(), "hh:mm a"),
+        time: format(now, "hh:mm a"),
       };
 
-      if (docSnap?.exists()) {
-        const senderQuotesRef = doc(db, "chats", docSnap.id);
-        const data = docSnap.data();
-        console.log("It should not run", data);
+      const chatRef = doc(db, "chats", chatId);
+      const userRef = doc(db, "users", user.id);
+      const chatSnap = await getDoc(chatRef);
+
+      if (chatSnap.exists()) {
+        const data = chatSnap.data();
         const quotesByDate = data.data || [];
-        const existingScore = data.score || 0;
 
         const existingDateIndex = quotesByDate.findIndex(
           (entry: any) => entry.date === formattedDate
         );
-        console.log("existing ", existingDateIndex);
+
         if (existingDateIndex !== -1) {
           quotesByDate[existingDateIndex].quotes.push(newQuote);
         } else {
@@ -331,32 +338,27 @@ const ChatScreen: React.FC = () => {
           });
         }
 
-        await updateDoc(senderQuotesRef, {
+        await updateDoc(chatRef, {
           data: quotesByDate,
-          score: existingScore + wordCount,
         });
       } else {
-        // console.log("It should run");
-        const chatDocRef = doc(collection(db, "chats"));
-        await setDoc(chatDocRef, {
+        await setDoc(chatRef, {
           data: [
             {
               date: formattedDate,
               quotes: [newQuote],
             },
           ],
-          score: wordCount,
           users: [user.id, partner.id],
         });
       }
 
+      await updateDoc(userRef, {
+        score: score + wordCount,
+      });
+
       setMessage("");
-      const noww = Date.now(); // current timestamp in ms
-      // dispatch(setLastSent(noww));
-      // dispatch(setTimer(120)); // 2 hours cooldown in minutes
-      // toast.show({
-      //   description: "Your quote has been sent!",
-      // });
+      // Dispatch cooldown if needed
     } catch (error) {
       console.log(error);
       const err = handleApiError(error);
@@ -365,6 +367,10 @@ const ChatScreen: React.FC = () => {
       setSpinner(false);
     }
   };
+
+  useEffect(() => {
+    scrollViewRef.current?.scrollToEnd({ animated: true });
+  }, [quotes?.data.length]);
   // const onRefresh = () => {
   //   setLoading(true);
   //   getQuotes();
@@ -374,6 +380,7 @@ const ChatScreen: React.FC = () => {
   //   const interval = startCountdown(timer, dispatch);
   //   if (interval) clearInterval(interval);
   // };
+  // console.log(JSON.stringify(quotes?.data));
   return (
     <SafeAreaView style={styles.container}>
       {partner?.partnerId ? (
@@ -428,11 +435,15 @@ const ChatScreen: React.FC = () => {
               <Text style={styles.noQuotesText}>No quotes yet...</Text>
             ) : (
               <ScrollView
+                ref={scrollViewRef}
                 nestedScrollEnabled
                 showsVerticalScrollIndicator={false}
                 style={{ maxHeight: 300 }}
+                onContentSizeChange={() =>
+                  scrollViewRef.current?.scrollToEnd({ animated: true })
+                }
               >
-                {quotes?.data.map((item, i) => {
+                {quotes?.data?.map((item, i) => {
                   return (
                     <View key={i}>
                       <Text style={styles.dateText}>{item.date}</Text>
@@ -461,7 +472,7 @@ const ChatScreen: React.FC = () => {
                                   <Text style={styles.metaText}>
                                     <Ionicons
                                       name={
-                                        quote.seen && quotes.paid
+                                        quote.seen && user.paid
                                           ? "checkmark-done"
                                           : "checkmark"
                                       }

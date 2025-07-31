@@ -1,20 +1,23 @@
+import { Timestamp } from "firebase/firestore";
+
 export interface IUser {
   id: string;
   name: string;
   email: string;
+
   verified: boolean;
+  paid: boolean;
+  lastbill: Timestamp;
   profile: string;
   bio: string;
   partnerId: string;
   isPaired: boolean;
-  points: number;
+  score: number;
 }
 
 export interface IQuotes {
   id: string;
   users: string[];
-  score: number;
-  paid: boolean;
   data: {
     date: string;
     quotes: {

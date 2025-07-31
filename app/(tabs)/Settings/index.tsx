@@ -116,16 +116,6 @@ const SettingsScreen = () => {
     );
   };
 
-  const openPrivacyPolicy = () => {
-    // Replace with your actual privacy policy URL
-    Linking.openURL("https://yourwebsite.com/privacy");
-  };
-
-  const openTermsConditions = () => {
-    // Replace with your actual terms URL
-    Linking.openURL("https://yourwebsite.com/terms");
-  };
-
   if (loading) {
     return (
       <SafeAreaView style={[styles.container, styles.loadingContainer]}>
@@ -233,7 +223,7 @@ const SettingsScreen = () => {
             </View>
             <TouchableOpacity
               style={[styles.button, styles.premiumButton]}
-              onPress={handleUpgrade}
+              onPress={() => router.push("/(tabs)/Settings/Payment")}
             >
               <Text style={styles.buttonText}>Upgrade Now - $4.99/month</Text>
             </TouchableOpacity>
@@ -292,7 +282,7 @@ const SettingsScreen = () => {
           <Text style={styles.sectionTitle}>Legal</Text>
           <TouchableOpacity
             style={styles.legalItem}
-            onPress={openPrivacyPolicy}
+            onPress={() => router.push("/(tabs)/Settings/PrivacyPolicy")}
           >
             <Ionicons name="lock-closed" size={20} color="#64748b" />
             <Text style={styles.legalText}>Privacy Policy</Text>
@@ -306,7 +296,7 @@ const SettingsScreen = () => {
           <View style={styles.divider} />
           <TouchableOpacity
             style={styles.legalItem}
-            onPress={openTermsConditions}
+            onPress={() => router.push("/(tabs)/Settings/TermsCondition")}
           >
             <Ionicons name="document-text" size={20} color="#64748b" />
             <Text style={styles.legalText}>Terms & Conditions</Text>
