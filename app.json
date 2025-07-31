@@ -19,7 +19,10 @@
         "foregroundImage": "./assets/new-images/splash-icon.png",
         "backgroundColor": "#000"
       },
-      "permissions": ["READ_EXTERNAL_STORAGE", "WRITE_EXTERNAL_STORAGE"],
+      "permissions": [
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ],
       "package": "com.devac95585.lovemeter"
     },
     "plugins": [
@@ -41,7 +44,7 @@
         "origin": false
       },
       "eas": {
-        "projectId": "04052f0c-2002-443f-99f4-809232e3a9f6"
+        "projectId": "5608c9f4-a176-4476-9044-369b7f7d09e5"
       }
     }
   }
