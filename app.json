@@ -17,12 +17,9 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/new-images/splash-icon.png",
-        "backgroundColor": "#000"
+        "backgroundColor": "#000000"
       },
-      "permissions": [
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE"
-      ],
+      "permissions": ["READ_EXTERNAL_STORAGE", "WRITE_EXTERNAL_STORAGE"],
       "package": "com.devac95585.lovemeter"
     },
     "plugins": [
@@ -32,7 +29,7 @@
         {
           "image": "./assets/new-images/splash-screen.png",
           "resizeMode": "cover",
-          "backgroundColor": "#000"
+          "backgroundColor": "#000000"
         }
       ]
     ],
