@@ -1,3 +1,4 @@
+import { ToastProvider } from "@/providers/toast-provider";
 import { store } from "@/redux/store";
 import { useFonts } from "expo-font";
 import { Stack, useRouter } from "expo-router";
@@ -36,16 +37,18 @@ export default function RootLayout() {
   return (
     // <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
     // <NativeBaseProvider>
-    <Provider store={store}>
-      {/* <PersistGate loading={null} persistor={persistor}> */}
-      <Stack initialRouteName="index" screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="login" />
-        <Stack.Screen name="+not-found" />
-      </Stack>
-      <StatusBar style="auto" />
-      {/* </PersistGate> */}
-    </Provider>
+    <ToastProvider>
+      <Provider store={store}>
+        {/* <PersistGate loading={null} persistor={persistor}> */}
+        <Stack initialRouteName="index" screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="login" />
+          <Stack.Screen name="+not-found" />
+        </Stack>
+        <StatusBar style="auto" />
+        {/* </PersistGate> */}
+      </Provider>
+    </ToastProvider>
     // </NativeBaseProvider>
     // </ThemeProvider>
   );

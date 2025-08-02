@@ -1,20 +1,25 @@
+import { useAppSelector } from "@/hooks/use-redux";
+import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import { useRouter } from "expo-router";
 import React from "react";
 import {
+  StatusBar,
   StyleSheet,
   Text,
-  View,
   TouchableOpacity,
-  StatusBar,
+  View,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import { useAppSelector } from "@/hooks/use-redux";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { LinearGradient } from "expo-linear-gradient";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 
 const HomeScreen = () => {
   const router = useRouter();
   const { user, partner } = useAppSelector((s) => s.user);
+
+  const { top } = useSafeAreaInsets();
   const features = [
     { title: "Chat", icon: "chatbubble-ellipses", route: "/(tabs)/Home/Chats" },
     { title: "Quizzes", icon: "bulb", route: "/(tabs)/Home/Quizzes" },
@@ -24,8 +29,8 @@ const HomeScreen = () => {
   ];
 
   const gradientCardColors = [
-    "#fbc2eb",
-    "#f78ca0",
+    "#f8ccd8",
+    "#f28ca0",
     "#fccde2",
     "#fddde6",
     "#f8c6d8",
@@ -48,13 +53,11 @@ const HomeScreen = () => {
         colors={["#f78ca0", "#fbc2eb"]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={styles.header}
+        style={[styles.header, { paddingVertical: top }]}
       >
         <Text style={styles.greeting}>
-          Hello, {user?.name || user?.email?.split("@")[0]} ❤️
-        </Text>
-        <Text style={styles.partnerName}>
-          Your Partner: {partner?.name || partner?.email?.split("@")[0]}
+          {user?.name || user?.email?.split("@")[0]} 💗{" "}
+          {partner?.name || partner?.email?.split("@")[0]}
         </Text>
       </LinearGradient>
 
@@ -80,14 +83,6 @@ const HomeScreen = () => {
           </TouchableOpacity>
         ))}
       </View>
-
-      {/* Bottom Gradient */}
-      <LinearGradient
-        colors={["#fbc2eb", "#f78ca0"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.bottomGradient}
-      />
     </View>
   );
 };
@@ -98,8 +93,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff" },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
   header: {
-    paddingTop: 60,
-    paddingBottom: 30,
     paddingHorizontal: 20,
     borderBottomLeftRadius: 40,
     borderBottomRightRadius: 40,

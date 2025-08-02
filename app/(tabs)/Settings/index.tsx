@@ -1,6 +1,11 @@
+import { useAppDispatch, useAppSelector } from "@/hooks/use-redux";
+import { useToast } from "@/providers/toast-provider";
+import { setQuote } from "@/redux/slices/quotes-slice";
+import { setPartner, setUser } from "@/redux/slices/user-slice";
 import { auth, db } from "@/utils/firebase";
 import { unPairUsers } from "@/utils/firebase-functions/unpair-req";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import React, { useEffect, useState } from "react";
@@ -18,10 +23,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-// import { useToast } from "native-base";
-import { useAppDispatch, useAppSelector } from "@/hooks/use-redux";
-import { setQuote } from "@/redux/slices/quotes-slice";
-import { setPartner, setUser } from "@/redux/slices/user-slice";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const SettingsScreen = () => {
   const router = useRouter();
@@ -34,7 +36,8 @@ const SettingsScreen = () => {
   });
   const [avatar, setAvatar] = useState(null);
   const [isPremium, setIsPremium] = useState(false);
-  // const toast = useToast();
+  const { toast } = useToast();
+  const { top } = useSafeAreaInsets();
   const dispatch = useAppDispatch();
 
   const fetchUserData = async () => {
@@ -89,10 +92,10 @@ const SettingsScreen = () => {
     try {
       setLoading(true);
       await unPairUsers();
-      // toast.show({ description: "Successfully unpaired!" });
+      toast("Successfully unpaired!");
       dispatch(setPartner(null));
     } catch (error: any) {
-      alert(`Unpairing failed: ${error.message}`);
+      toast(`Unpairing failed: ${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -139,9 +142,16 @@ const SettingsScreen = () => {
         }
       >
         {/* Header with pink background */}
-        <View style={styles.header}>
-          <Text style={styles.title}>Profile Settings</Text>
-        </View>
+        <LinearGradient
+          colors={["#f78ca0", "#fbc2eb"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.header, { paddingVertical: top }]}
+        >
+          <Text style={styles.greeting}>
+            {user?.name || user?.email?.split("@")[0]}
+          </Text>
+        </LinearGradient>
 
         {/* Profile Section */}
         <View style={styles.profileSection}>
@@ -196,43 +206,6 @@ const SettingsScreen = () => {
           )}
         </View>
 
-        {/* Premium Subscription Section */}
-        {!isPremium && (
-          <View style={styles.card}>
-            <View style={styles.premiumHeader}>
-              <Ionicons name="diamond" size={24} color="#f59e0b" />
-              <Text style={styles.sectionTitle}>Go Premium</Text>
-            </View>
-            <Text style={styles.premiumDescription}>
-              Unlock all features including unlimited quotes, premium content,
-              and more!
-            </Text>
-            <View style={styles.premiumFeatures}>
-              <View style={styles.featureItem}>
-                <Ionicons name="checkmark-circle" size={18} color="#10b981" />
-                <Text style={styles.featureText}>Unlimited Quotes</Text>
-              </View>
-              <View style={styles.featureItem}>
-                <Ionicons name="checkmark-circle" size={18} color="#10b981" />
-                <Text style={styles.featureText}>Exclusive Content</Text>
-              </View>
-              <View style={styles.featureItem}>
-                <Ionicons name="checkmark-circle" size={18} color="#10b981" />
-                <Text style={styles.featureText}>No Ads</Text>
-              </View>
-            </View>
-            <TouchableOpacity
-              style={[styles.button, styles.premiumButton]}
-              onPress={() => router.push("/(tabs)/Settings/Payment")}
-            >
-              <Text style={styles.buttonText}>Upgrade Now - $4.99/month</Text>
-            </TouchableOpacity>
-            <Text style={styles.noteText}>
-              * Contact support for manual payment options
-            </Text>
-          </View>
-        )}
-
         {/* Profile Actions */}
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Profile Settings</Text>
@@ -276,6 +249,43 @@ const SettingsScreen = () => {
             </TouchableOpacity>
           )}
         </View>
+
+        {/* Premium Subscription Section */}
+        {!user?.paid && (
+          <View style={styles.card}>
+            <View style={styles.premiumHeader}>
+              <Ionicons name="diamond" size={24} color="#f59e0b" />
+              <Text style={styles.sectionTitle}>Go Premium</Text>
+            </View>
+            <Text style={styles.premiumDescription}>
+              Unlock all features including unlimited quotes, premium content,
+              and more!
+            </Text>
+            <View style={styles.premiumFeatures}>
+              <View style={styles.featureItem}>
+                <Ionicons name="checkmark-circle" size={18} color="#10b981" />
+                <Text style={styles.featureText}>Unlimited Quotes</Text>
+              </View>
+              <View style={styles.featureItem}>
+                <Ionicons name="checkmark-circle" size={18} color="#10b981" />
+                <Text style={styles.featureText}>Exclusive Content</Text>
+              </View>
+              <View style={styles.featureItem}>
+                <Ionicons name="checkmark-circle" size={18} color="#10b981" />
+                <Text style={styles.featureText}>No Ads</Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              style={[styles.button, styles.premiumButton]}
+              onPress={() => router.push("/(tabs)/Settings/Payment")}
+            >
+              <Text style={styles.buttonText}>Upgrade Now - $4.99/month</Text>
+            </TouchableOpacity>
+            <Text style={styles.noteText}>
+              * Contact support for manual payment options
+            </Text>
+          </View>
+        )}
 
         {/* Legal Section */}
         <View style={styles.card}>
@@ -346,6 +356,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#fff",
   },
+  greeting: { fontSize: 24, fontWeight: "bold", color: "#ffffff" },
   loadingContainer: {
     justifyContent: "center",
     alignItems: "center",
@@ -354,11 +365,15 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   header: {
-    padding: 20,
-    backgroundColor: "#ec4899",
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-    marginBottom: 20,
+    paddingHorizontal: 20,
+    borderBottomLeftRadius: 40,
+    borderBottomRightRadius: 40,
+    shadowColor: "#ec4899",
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
+    alignItems: "center",
+    justifyContent: "center",
   },
   title: {
     fontSize: 22,

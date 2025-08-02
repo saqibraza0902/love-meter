@@ -1,3 +1,12 @@
+import { db } from "@/utils/firebase";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import {
+  collection,
+  getDocs,
+  query,
+  Timestamp,
+  where,
+} from "firebase/firestore";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -9,16 +18,6 @@ import {
   Text,
   View,
 } from "react-native";
-// import { Pressable } from "native-base";
-import { db } from "@/utils/firebase";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import {
-  collection,
-  getDocs,
-  query,
-  Timestamp,
-  where,
-} from "firebase/firestore";
 import { SafeAreaView } from "react-native-safe-area-context";
 export type TThing = {
   id: string;

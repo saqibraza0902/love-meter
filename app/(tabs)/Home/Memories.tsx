@@ -1,6 +1,10 @@
 import { useAppSelector } from "@/hooks/use-redux";
+import { useToast } from "@/providers/toast-provider";
 import { db } from "@/utils/firebase";
+import { uploadImageAsync } from "@/utils/firebase-functions/upload-img";
+import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
+import { LinearGradient } from "expo-linear-gradient";
 import {
   addDoc,
   arrayUnion,
@@ -27,10 +31,6 @@ import {
   View,
 } from "react-native";
 import { Calendar } from "react-native-calendars";
-// import { useToast } from "native-base";
-import { uploadImageAsync } from "@/utils/firebase-functions/upload-img";
-import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
 
 const HEIGHT = Dimensions.get("window").height;
 
@@ -95,7 +95,7 @@ const CalendarScreen = () => {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  // const toast = useToast();
+  const { toast } = useToast();
   const [fullImageVisible, setFullImageVisible] = useState(false);
 
   const users = [user?.id || "", partner?.id || ""];
@@ -144,20 +144,18 @@ const CalendarScreen = () => {
 
   const saveMemory = async () => {
     if (!memoryText || !memoryImage) {
-      // toast.show({ description: "Please select an image and write a memory!" });
-      return;
+      return toast("Please select an image and write a memory!");
     }
 
     if (memoryText.split(" ").length > 20) {
-      // toast.show({ description: "Please limit your memory to 20 words." });
-      return;
+      return toast("Please limit your memory to 20 words.");
     }
 
     try {
       setUploading(true);
       const imageUrl = await uploadImageAsync(memoryImage, setUploadProgress);
       await uploadMemory(users, selectedDate!, memoryText, imageUrl);
-      // toast.show({ description: "Memory saved successfully!" });
+      toast("Memory saved successfully!");
 
       setModalVisible(false);
       setMemoryText("");
@@ -165,7 +163,7 @@ const CalendarScreen = () => {
       setUploadProgress(0);
       loadMemories();
     } catch (error) {
-      // toast.show({ description: "Failed to save memory. Please try again." });
+      toast("Failed to save memory. Please try again.");
     } finally {
       setUploading(false);
     }
