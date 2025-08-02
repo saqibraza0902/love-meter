@@ -1,3 +1,5 @@
+import { useToast } from "@/providers/toast-provider";
+import { handleApiError } from "@/utils/handle-api-errors";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useRouter } from "expo-router";
@@ -5,7 +7,7 @@ import { createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
 import React, { useState } from "react";
 import {
-  Alert,
+  ActivityIndicator,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -16,12 +18,10 @@ import {
   View,
 } from "react-native";
 import { auth, db } from "../utils/firebase";
-// import { Spinner, useToast } from "native-base";
-import { handleApiError } from "@/utils/handle-api-errors";
 
 const SignUp = () => {
   const [email, setEmail] = useState("");
-  // const toast = useToast();
+  const { toast } = useToast();
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [isPasswordVisible, setIsPasswordVisible] = useState<boolean>(false);
@@ -34,11 +34,11 @@ const SignUp = () => {
     Keyboard.dismiss();
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      Alert.alert("Invalid Email", "Please enter a valid email address.");
+      toast("Invalid Email, Please enter a valid email address.");
       return;
     }
     if (!name || !email || !password) {
-      Alert.alert("Missing Fields", "Please fill out all fields.");
+      toast("Missing Fields, Please fill out all fields.");
       return;
     }
 
@@ -54,10 +54,10 @@ const SignUp = () => {
       });
 
       router.replace("/(tabs)/Home");
-      // toast.show({ description: "Signed up successfully!" });
+      toast("Signed up successfully!");
     } catch (error) {
       const err = handleApiError(error);
-      // toast.show({ description: err });
+      toast(err);
     } finally {
       setIsLoading(false);
     }
@@ -123,9 +123,8 @@ const SignUp = () => {
           disabled={isDisabled}
         >
           {isLoading ? (
-            <Text>Loading...</Text>
+            <ActivityIndicator color="#fff" />
           ) : (
-            // <Spinner color="#fff" />
             <Text style={styles.buttonText}>Sign Up</Text>
           )}
         </TouchableOpacity>

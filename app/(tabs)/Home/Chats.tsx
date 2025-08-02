@@ -1,8 +1,12 @@
 import { useAppDispatch, useAppSelector } from "@/hooks/use-redux";
+import { useToast } from "@/providers/toast-provider";
+import { setTimer } from "@/redux/slices/user-slice";
 import { auth, db } from "@/utils/firebase";
 import { formatCustomDate } from "@/utils/format-date";
+import { handleApiError } from "@/utils/handle-api-errors";
 import { IQuotes } from "@/utils/types";
 import { Ionicons } from "@expo/vector-icons";
+import { format } from "date-fns";
 import {
   collection,
   doc,
@@ -15,7 +19,7 @@ import {
 } from "firebase/firestore";
 import React, { useEffect, useRef, useState } from "react";
 import {
-  Alert,
+  ActivityIndicator,
   Animated,
   Keyboard,
   KeyboardAvoidingView,
@@ -27,10 +31,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-// import { Spinner, useToast } from "native-base";
-import { setTimer } from "@/redux/slices/user-slice";
-import { handleApiError } from "@/utils/handle-api-errors";
-import { format } from "date-fns";
 import { SafeAreaView } from "react-native-safe-area-context";
 const ChatScreen: React.FC = () => {
   const { partner, user, timer, lastSent } = useAppSelector((s) => s.user);
@@ -43,7 +43,7 @@ const ChatScreen: React.FC = () => {
 
   const dispatch = useAppDispatch();
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  // const toast = useToast();
+  const { toast } = useToast();
   const getUserScores = async () => {
     const userId = auth.currentUser?.uid;
     if (!userId || !user?.partnerId) return;
@@ -58,8 +58,7 @@ const ChatScreen: React.FC = () => {
         }
       },
       (error) => {
-        return;
-        // toast.show({ description: handleApiError(error) });
+        return toast(handleApiError(error));
       }
     );
     return unsubscribeUserScores;
@@ -282,13 +281,11 @@ const ChatScreen: React.FC = () => {
   const sendQuote = async () => {
     Keyboard.dismiss();
     if (!user || !partner) {
-      Alert.alert("Cooldown", "You can only send a quote every 2 hours");
-      return;
+      return toast("Cooldown, You can only send a quote every 2 hours");
     }
 
     if (message.trim().length === 0) {
-      Alert.alert("Error", "Please enter a quote");
-      return;
+      return toast("Error, Please enter a quote");
     }
 
     try {
@@ -351,7 +348,7 @@ const ChatScreen: React.FC = () => {
     } catch (error) {
       console.log(error);
       const err = handleApiError(error);
-      // toast.show({ description: err });
+      toast(err);
     } finally {
       setSpinner(false);
     }
@@ -409,12 +406,7 @@ const ChatScreen: React.FC = () => {
             >
               {!spinner && <Ionicons name="heart" size={20} color="#fff" />}
               <Text style={styles.buttonText}>
-                {spinner ? (
-                  <Text>Loading...</Text>
-                ) : (
-                  // <Spinner color="#fff" />
-                  "Send Quote"
-                )}
+                {spinner ? <ActivityIndicator color="#fff" /> : "Send Quote"}
               </Text>
             </TouchableOpacity>
             {timer > 0 && (

@@ -1,3 +1,4 @@
+import { useToast } from "@/providers/toast-provider";
 import { DEFAULT_PROFILE } from "@/utils/default-url";
 import { auth } from "@/utils/firebase";
 import { sendPairingRequest } from "@/utils/firebase-functions/send-pair-req";
@@ -17,14 +18,13 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-// import { useToast } from "native-base";
 
 const SendRequestScreen = () => {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
-  // const toast = useToast();
+  const { toast } = useToast();
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   const handleSendRequest = async () => {
@@ -53,7 +53,7 @@ const SendRequestScreen = () => {
       }, 3000);
     } catch (error) {
       const err = handleApiError(error);
-      // toast.show({ description: err });
+      toast(err);
     } finally {
       setLoading(false);
     }

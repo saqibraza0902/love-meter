@@ -1,9 +1,11 @@
+import { useToast } from "@/providers/toast-provider";
 import { handleApiError } from "@/utils/handle-api-errors";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useRouter } from "expo-router";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import React, { useState } from "react";
 import {
+  ActivityIndicator,
   Keyboard,
   StyleSheet,
   Text,
@@ -12,7 +14,6 @@ import {
   View,
 } from "react-native";
 import { auth } from "../utils/firebase";
-// import { Spinner, useToast } from "native-base";
 
 const LoginScreen = () => {
   const [email, setEmail] = useState("");
@@ -21,7 +22,7 @@ const LoginScreen = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const router = useRouter();
-  // const toast = useToast();
+  const { toast } = useToast();
 
   const isDisabled = !email || !password || isLoading;
 
@@ -29,7 +30,7 @@ const LoginScreen = () => {
     Keyboard.dismiss();
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      // toast.show({ description: "Please enter a valid email address." });
+      toast("Please enter a valid email address.");
       return;
     }
     try {
@@ -38,7 +39,7 @@ const LoginScreen = () => {
       router.replace("/(tabs)/Home");
     } catch (error: any) {
       const err = handleApiError(error);
-      // toast.show({ description: err });
+      toast(err);
     } finally {
       setIsLoading(false);
     }
@@ -88,9 +89,8 @@ const LoginScreen = () => {
           disabled={isDisabled}
         >
           {isLoading ? (
-            <Text>Loading...</Text>
+            <ActivityIndicator color="#fff" />
           ) : (
-            // <Spinner color="#fff" />
             <Text style={styles.loginButtonText}>Login</Text>
           )}
         </TouchableOpacity>

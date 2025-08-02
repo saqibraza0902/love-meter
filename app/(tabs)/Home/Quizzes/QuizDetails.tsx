@@ -1,11 +1,11 @@
 import { useAppSelector } from "@/hooks/use-redux";
+import { useToast } from "@/providers/toast-provider";
 import { db } from "@/utils/firebase";
 import { useRoute } from "@react-navigation/native";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Image,
   ScrollView,
   StyleSheet,
@@ -14,13 +14,12 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-// import { useToast } from "native-base";
 
 const QuizDetail = () => {
   const { params } = useRoute();
   //@ts-ignore
   const id: any = params.id;
-  // const toast = useToast();
+  const { toast } = useToast();
   const { user, partner } = useAppSelector((s) => s.user);
 
   const [quizData, setQuizData] = useState<any>({});
@@ -51,11 +50,11 @@ const QuizDetail = () => {
           setIsPartner(isUserPartner);
           setAuthorized(isUserCreator || isUserPartner);
         } else {
-          Alert.alert("Not Found", "Quiz does not exist.");
+          toast("Not Found , Quiz does not exist.");
         }
       } catch (error) {
         console.error(error);
-        Alert.alert("Error", "Failed to fetch quiz.");
+        toast("Error, Failed to fetch quiz.");
       } finally {
         setLoading(false);
       }
@@ -86,10 +85,7 @@ const QuizDetail = () => {
     );
 
     if (!allAnswered) {
-      // toast.show({
-      //   description: "Please answer all questions before submitting.",
-      // });
-      return;
+      return toast("Please answer all questions before submitting.");
     }
 
     try {
@@ -101,10 +97,10 @@ const QuizDetail = () => {
       });
 
       setSubmitted(true);
-      Alert.alert("Success", "Quiz submitted successfully!");
+      toast("Success,Quiz submitted successfully!");
     } catch (error) {
       console.error("Error submitting quiz:", error);
-      Alert.alert("Error", "Failed to submit quiz. Please try again.");
+      toast("Error, Failed to submit quiz. Please try again.");
     }
   };
 

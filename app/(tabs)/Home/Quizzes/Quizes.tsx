@@ -1,4 +1,5 @@
 import { useAppSelector } from "@/hooks/use-redux";
+import { useToast } from "@/providers/toast-provider";
 import { db } from "@/utils/firebase";
 import { useRouter } from "expo-router";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
@@ -12,13 +13,12 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-// import { useToast } from "native-base";
 
 const QuizzesScreen = () => {
   const [quizzes, setQuizzes] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  // const toast = useToast();
+  const { toast } = useToast();
   const { user, partner } = useAppSelector((s) => s.user);
 
   useEffect(() => {
@@ -52,7 +52,7 @@ const QuizzesScreen = () => {
               params: { id: item.id },
             });
           } else {
-            // toast.show({ description: "Quiz not submitted yet" });
+            toast("Quiz not submitted yet");
           }
         }}
       >
