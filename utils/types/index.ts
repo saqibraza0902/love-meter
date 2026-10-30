@@ -1,5 +1,3 @@
-import { Timestamp } from "firebase/firestore";
-
 export interface IUser {
   id: string;
   name: string;
@@ -7,12 +5,15 @@ export interface IUser {
 
   verified: boolean;
   paid: boolean;
-  lastbill: Timestamp;
-  profile: string;
+  lastbill?: string;
+  profile?: string;
+  photoURL?: string | null;
   bio: string;
   partnerId: string;
   isPaired: boolean;
   score: number;
+  coupleId?: string;
+  ai_consent_at?: string | null;
 }
 
 export interface IQuotes {

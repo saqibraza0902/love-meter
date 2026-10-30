@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+﻿import React, { useState } from "react";
 import {
   StyleSheet,
   Text,
@@ -10,14 +10,11 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from "react-native";
-import * as ImagePicker from "expo-image-picker";
-import { addDoc, Timestamp, collection } from "firebase/firestore";
-import { db } from "@/utils/firebase";
-import { storage } from "@/utils/firebase";
-import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
+import * as ImagePicker from "@/utils/image-picker-compat";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useLocalSearchParams } from "expo-router";
-import { uploadImageAsync } from "@/utils/firebase-functions/upload-img";
+import { useLocalSearchParams } from "@/navigation/router-compat";
+import { getCurrentUser, supabase, uploadImage } from "@/utils/supabase";
+import ScreenBackButton from "@/components/ScreenBackButton";
 
 const AddTTDT = () => {
   const [imageUri, setImageUri] = useState<string | null>(null);
@@ -61,17 +58,22 @@ const AddTTDT = () => {
     try {
       let imageUrl = null;
       if (imageUri) {
-        imageUrl = await uploadImageAsync(imageUri, setUploadProgress);
+        const user = await getCurrentUser();
+        if (!user) throw new Error("Please sign in first.");
+        imageUrl = await uploadImage(imageUri, `${user.id}/things/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`, "public-content", setUploadProgress);
       }
 
-      await addDoc(collection(db, "ttdt"), {
+      const user = await getCurrentUser();
+      if (!user) throw new Error("Please sign in first.");
+      const { error } = await supabase.from("things_to_do").insert({
         title: title.trim(),
         description: description.trim() || null,
         link: link.trim() || null,
-        imageUrl: imageUrl || null,
-        createdAt: Timestamp.now(),
+        image_path: imageUrl || null,
+        created_by: user.id,
         slug: slug || null,
       });
+      if (error) throw error;
 
       Alert.alert("Success", "Item added successfully!");
       setTitle("");
@@ -79,8 +81,8 @@ const AddTTDT = () => {
       setLink("");
       setImageUri(null);
     } catch (error) {
-      Alert.alert("Error", "Failed to save item.");
-      console.error(error);
+      console.error("Could not save activity", error);
+      Alert.alert("Couldn't save item", error instanceof Error ? error.message : "Please try again.");
     } finally {
       setLoading(false);
       setUploadProgress(null);
@@ -90,6 +92,7 @@ const AddTTDT = () => {
   return (
     <SafeAreaView style={{ flex: 1 }}>
       <ScrollView contentContainerStyle={styles.container}>
+        <ScreenBackButton label="Back to ideas" />
         <Text style={styles.title}>Add New TTDT</Text>
 
         <Text style={styles.label}>Title *</Text>
@@ -155,14 +158,14 @@ export default AddTTDT;
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: "#fff1f2",
+    backgroundColor: "#f7f2eb",
     padding: 20,
     flexGrow: 1,
   },
   title: {
     fontSize: 26,
     fontWeight: "bold",
-    color: "#ec4899",
+    color: "#a65f65",
     textAlign: "center",
     marginBottom: 20,
   },
@@ -171,16 +174,16 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     fontWeight: "600",
     fontSize: 16,
-    color: "#ec4899",
+    color: "#a65f65",
   },
   input: {
     borderWidth: 1,
-    borderColor: "#ec4899",
+    borderColor: "#a65f65",
     borderRadius: 12,
     padding: 12,
     fontSize: 16,
-    backgroundColor: "#fff0f6",
-    color: "#374151",
+    backgroundColor: "#fcf5f2",
+    color: "#4a413a",
   },
   textArea: {
     height: 100,
@@ -189,13 +192,13 @@ const styles = StyleSheet.create({
   imagePicker: {
     width: "100%",
     height: 200,
-    backgroundColor: "#f9fafb",
+    backgroundColor: "#fffdfa",
     justifyContent: "center",
     alignItems: "center",
     marginTop: 20,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: "#ec4899",
+    borderColor: "#a65f65",
   },
   image: {
     width: "100%",
@@ -204,12 +207,12 @@ const styles = StyleSheet.create({
     resizeMode: "cover",
   },
   saveButton: {
-    backgroundColor: "#ec4899",
+    backgroundColor: "#a65f65",
     paddingVertical: 14,
     borderRadius: 12,
     marginTop: 24,
     alignItems: "center",
-    shadowColor: "#ec4899",
+    shadowColor: "#a65f65",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 6,

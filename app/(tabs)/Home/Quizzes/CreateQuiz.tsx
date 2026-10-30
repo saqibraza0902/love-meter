@@ -1,13 +1,10 @@
-import { useAppSelector } from "@/hooks/use-redux";
+﻿import { useAppSelector } from "@/hooks/use-redux";
 import { useToast } from "@/providers/toast-provider";
-import { db } from "@/utils/firebase";
-import { Feather } from "@expo/vector-icons";
+import { supabase, uploadImage } from "@/utils/supabase";
+import Feather from "react-native-vector-icons/Feather";
 import { useNavigation } from "@react-navigation/native";
-import Checkbox from "expo-checkbox";
-import * as FileSystem from "expo-file-system";
-import * as ImagePicker from "expo-image-picker";
-import { useRouter } from "expo-router";
-import { addDoc, collection } from "firebase/firestore";
+import * as ImagePicker from "@/utils/image-picker-compat";
+import { useRouter } from "@/navigation/router-compat";
 import React, { useState } from "react";
 import {
   Image,
@@ -19,6 +16,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import ScreenBackButton from "@/components/ScreenBackButton";
 
 type Option = {
   text: string;
@@ -64,18 +62,10 @@ const CreateQuiz = () => {
 
     if (!result.canceled) {
       try {
-        // Read the image file and convert to Base64
-        const base64 = await FileSystem.readAsStringAsync(
-          result.assets[0].uri,
-          {
-            encoding: FileSystem.EncodingType.Base64,
-          }
-        );
-
         const newQuestions = [...questions];
         newQuestions[qIndex].options[optIndex] = {
           ...newQuestions[qIndex].options[optIndex],
-          image: `data:image/jpeg;base64,${base64}`,
+          image: result.assets[0].uri,
           text: "", // Clear text when image is added
         };
         setQuestions(newQuestions);
@@ -189,25 +179,21 @@ const CreateQuiz = () => {
         return toast("Please complete all the fields");
       }
 
-      // Prepare cleaned questions
-      const cleanedQuestions = questions.map((question) => ({
-        ...question,
-        options: question.options.map((option) => ({
+      if (!user?.coupleId) return toast("Your account needs an active couple to create a quiz.");
+      const cleanedQuestions = await Promise.all(questions.map(async (question) => ({
+        question: question.question.trim(),
+        correctIndex: question.correctIndex,
+        options: await Promise.all(question.options.map(async (option) => ({
           text: option.text || "",
-          ...(option.image ? { image: option.image } : {}),
-        })),
-      }));
-
-      const quizData = {
-        name: quizName,
-        creatorId: user?.id,
-        users: [user?.id, partner.id],
-        status: false,
-        questions: cleanedQuestions,
-        createdAt: new Date(),
-      };
-
-      await addDoc(collection(db, "quizzes"), quizData);
+          ...(option.image ? { image_path: await uploadImage(option.image, `${user.coupleId}/quizzes/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`) } : {}),
+        }))),
+      })));
+      const { error } = await supabase.rpc("create_quiz", {
+        target_couple: user.coupleId,
+        quiz_name: quizName.trim(),
+        quiz_questions: cleanedQuestions,
+      });
+      if (error) throw error;
 
       toast("Quiz created successfully");
       router.back();
@@ -248,14 +234,14 @@ const CreateQuiz = () => {
                   updateOptionText(text, qIndex, optIndex)
                 }
                 placeholder={`Enter option ${optIndex + 1}`}
-                placeholderTextColor="#9ca3af"
+                placeholderTextColor="#9a8e83"
               />
               {isPaidUser && (
                 <TouchableOpacity
                   style={styles.uploadImageButton}
                   onPress={() => pickImage(qIndex, optIndex)}
                 >
-                  <Feather name="image" size={18} color="#3b82f6" />
+                  <Feather name="image" size={18} color="#6d8777" />
                 </TouchableOpacity>
               )}
             </>
@@ -263,16 +249,14 @@ const CreateQuiz = () => {
         </View>
 
         <View style={styles.optionActions}>
-          <Checkbox
-            style={styles.checkbox}
-            value={questions[qIndex].correctIndex === optIndex}
-            onValueChange={() => setCorrectOption(qIndex, optIndex)}
-            color={
-              questions[qIndex].correctIndex === optIndex
-                ? "#10b981"
-                : undefined
-            }
-          />
+          <TouchableOpacity
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: questions[qIndex].correctIndex === optIndex }}
+            onPress={() => setCorrectOption(qIndex, optIndex)}
+            style={[styles.checkbox, { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: questions[qIndex].correctIndex === optIndex ? "#6d8777" : "#b8b0a8", alignItems: "center", justifyContent: "center" }]}
+          >
+            {questions[qIndex].correctIndex === optIndex && <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: "#6d8777" }} />}
+          </TouchableOpacity>
           <TouchableOpacity
             onPress={() => deleteOption(qIndex, optIndex)}
             style={styles.deleteOptionButton}
@@ -287,6 +271,7 @@ const CreateQuiz = () => {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
+        <ScreenBackButton label="Quizzes" />
         {/* Quiz Name Input */}
         <View style={styles.quizNameContainer}>
           <Text style={styles.sectionTitle}>Quiz Name</Text>
@@ -295,7 +280,7 @@ const CreateQuiz = () => {
             value={quizName}
             onChangeText={setQuizName}
             placeholder="Enter quiz name"
-            placeholderTextColor="#9ca3af"
+            placeholderTextColor="#9a8e83"
           />
         </View>
 
@@ -317,7 +302,7 @@ const CreateQuiz = () => {
               value={q.question}
               onChangeText={(text) => updateQuestionText(text, qIndex)}
               placeholder="Enter your question"
-              placeholderTextColor="#9ca3af"
+              placeholderTextColor="#9a8e83"
               multiline
             />
 
@@ -343,7 +328,7 @@ const CreateQuiz = () => {
               onPress={() => addOption(qIndex)}
               disabled={q.options.length >= 6}
             >
-              <Feather name="plus" size={18} color="#3b82f6" />
+              <Feather name="plus" size={18} color="#6d8777" />
               <Text style={styles.addOptionText}>Add Option</Text>
             </TouchableOpacity>
           </View>
@@ -354,7 +339,7 @@ const CreateQuiz = () => {
             style={styles.addQuestionButton}
             onPress={addQuestion}
           >
-            <Feather name="plus-circle" size={20} color="#3b82f6" />
+            <Feather name="plus-circle" size={20} color="#6d8777" />
             <Text style={styles.addQuestionText}>Add Question</Text>
           </TouchableOpacity>
         )}
@@ -372,7 +357,7 @@ const CreateQuiz = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f9fafb",
+    backgroundColor: "#fffdfa",
   },
   scrollContainer: {
     padding: 20,
@@ -392,22 +377,22 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#111827",
+    color: "#3f3832",
     marginBottom: 12,
   },
   input: {
-    backgroundColor: "#f3f4f6",
+    backgroundColor: "#f3ede5",
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
-    color: "#111827",
+    color: "#3f3832",
   },
   questionInput: {
-    backgroundColor: "#f3f4f6",
+    backgroundColor: "#f3ede5",
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
-    color: "#111827",
+    color: "#3f3832",
     minHeight: 60,
     textAlignVertical: "top",
   },
@@ -431,7 +416,7 @@ const styles = StyleSheet.create({
   optionsTitle: {
     fontSize: 16,
     fontWeight: "500",
-    color: "#374151",
+    color: "#4a413a",
     marginTop: 12,
     marginBottom: 8,
   },
@@ -439,12 +424,12 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
+    borderColor: "#e9dfd3",
     padding: 12,
   },
   correctOption: {
-    borderColor: "#10b981",
-    backgroundColor: "#ecfdf5",
+    borderColor: "#6d8777",
+    backgroundColor: "#e8eee7",
   },
   optionRow: {
     flexDirection: "row",
@@ -463,14 +448,14 @@ const styles = StyleSheet.create({
   optionLabel: {
     fontSize: 16,
     fontWeight: "500",
-    color: "#111827",
+    color: "#3f3832",
     marginRight: 10,
     width: 24,
   },
   optionInput: {
     flex: 1,
     fontSize: 16,
-    color: "#111827",
+    color: "#3f3832",
     paddingVertical: 6,
   },
   imageContainer: {
@@ -515,7 +500,7 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   addOptionText: {
-    color: "#3b82f6",
+    color: "#6d8777",
     marginLeft: 8,
     fontWeight: "500",
   },
@@ -525,11 +510,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     padding: 14,
     borderRadius: 8,
-    backgroundColor: "#eff6ff",
+    backgroundColor: "#e8eee7",
     marginBottom: 20,
   },
   addQuestionText: {
-    color: "#3b82f6",
+    color: "#6d8777",
     marginLeft: 8,
     fontWeight: "600",
     fontSize: 16,
@@ -542,10 +527,10 @@ const styles = StyleSheet.create({
     padding: 16,
     backgroundColor: "#fff",
     borderTopWidth: 1,
-    borderTopColor: "#e5e7eb",
+    borderTopColor: "#e9dfd3",
   },
   saveBtn: {
-    backgroundColor: "#3b82f6",
+    backgroundColor: "#6d8777",
     padding: 16,
     borderRadius: 12,
     alignItems: "center",

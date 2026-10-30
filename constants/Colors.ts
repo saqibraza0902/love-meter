@@ -1,3 +1,15 @@
 export const COLORS = {
-  primary_btn: "#f472b6",
+  primary_btn: "#a65f65",
+  rose: "#a65f65",
+  roseSoft: "#f0dfdc",
+  sage: "#6d8777",
+  sageSoft: "#e8eee7",
+  background: "#f7f2eb",
+  surface: "#fffdfa",
+  surfaceMuted: "#f3ede5",
+  text: "#3f3832",
+  textMuted: "#82766d",
+  border: "#e9dfd3",
+  danger: "#b85d55",
+  success: "#5f806b",
 };

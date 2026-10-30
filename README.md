@@ -1,50 +1,19 @@
-# Welcome to your Expo app 👋
+# Love Meter (React Native CLI)
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+This is the bare React Native Community CLI version of Love Meter. It keeps the existing screens and flows, Supabase Auth/Postgres/Realtime/Storage backend, shared chats, quizzes, memories, pairing, AI relationship guide, and RevenueCat subscriptions. Navigation is handled by React Navigation with a full-screen stack and no bottom tab bar.
 
-## Get started
+## Android setup
 
-1. Install dependencies
+1. Install Node.js 22.11 or newer, JDK 17, Android Studio, and Android SDK Platform Tools.
+2. Configure `JAVA_HOME` and `ANDROID_HOME`, then enable USB debugging and authorize this computer on the Android phone.
+3. Copy `.env.example` to `.env` and supply the Supabase URL/public key plus RevenueCat public SDK keys.
+4. Run `npm install`, then `npm start` in one terminal and `npm run android` in another.
+5. Check `adb devices` if the phone is not detected.
 
-   ```bash
-   npm install
-   ```
+## iOS setup
 
-2. Start the app
+Use macOS with Xcode and CocoaPods. Open `ios/LoveMeter.xcodeproj` or run `npm run ios` after `npm install` and `pod install`.
 
-   ```bash
-   npx expo start
-   ```
+## Backend
 
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
-```
-
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+The `supabase/` migrations and Edge Functions are unchanged. Apply migrations and deploy functions using the Supabase CLI as described in `supabase/README.md`. Keep service role keys and AI provider secrets on the server only.

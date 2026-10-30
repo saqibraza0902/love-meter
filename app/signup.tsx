@@ -1,10 +1,8 @@
-import { useToast } from "@/providers/toast-provider";
+﻿import { useToast } from "@/providers/toast-provider";
 import { handleApiError } from "@/utils/handle-api-errors";
-import FontAwesome from "@expo/vector-icons/FontAwesome";
-import MaterialIcons from "@expo/vector-icons/MaterialIcons";
-import { useRouter } from "expo-router";
-import { createUserWithEmailAndPassword } from "firebase/auth";
-import { doc, setDoc } from "firebase/firestore";
+import FontAwesome from "react-native-vector-icons/FontAwesome";
+import MaterialIcons from "react-native-vector-icons/MaterialIcons";
+import { useRouter } from "@/navigation/router-compat";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
@@ -17,7 +15,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { auth, db } from "../utils/firebase";
+import { supabase } from "../utils/supabase";
 
 const SignUp = () => {
   const [email, setEmail] = useState("");
@@ -44,16 +42,18 @@ const SignUp = () => {
 
     try {
       setIsLoading(true);
-      const user = await createUserWithEmailAndPassword(auth, email, password);
-
-      await setDoc(doc(db, "users", user.user.uid), {
-        name: name,
-        email: user.user.email,
-        verified: user.user.emailVerified,
-        profile: "",
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: { data: { name: name.trim() } },
       });
+      if (error) throw error;
+      if (!data.session) {
+        toast("Check your email to confirm your account, then log in.");
+        router.replace("/login");
+        return;
+      }
 
-      router.replace("/(tabs)/Home");
       toast("Signed up successfully!");
     } catch (error) {
       const err = handleApiError(error);
@@ -73,30 +73,30 @@ const SignUp = () => {
         <Text style={styles.subtitle}>Sign up to get started</Text>
 
         <View style={styles.inputWrapper}>
-          <FontAwesome name="user" size={20} color="#9ca3af" />
+          <FontAwesome name="user" size={20} color="#9a8e83" />
           <TextInput
             placeholder="Full Name"
             value={name}
             onChangeText={setName}
             style={styles.input}
-            placeholderTextColor="#9ca3af"
+            placeholderTextColor="#9a8e83"
           />
         </View>
 
         <View style={styles.inputWrapper}>
-          <MaterialIcons name="mail" size={20} color="#9ca3af" />
+          <MaterialIcons name="mail" size={20} color="#9a8e83" />
           <TextInput
             placeholder="Email"
             keyboardType="email-address"
             value={email}
             onChangeText={setEmail}
             style={styles.input}
-            placeholderTextColor="#9ca3af"
+            placeholderTextColor="#9a8e83"
           />
         </View>
 
         <View style={styles.inputWrapper}>
-          <MaterialIcons name="lock" size={20} color="#9ca3af" />
+          <MaterialIcons name="lock" size={20} color="#9a8e83" />
           <TextInput
             placeholder="Password"
             secureTextEntry={!isPasswordVisible}
@@ -104,7 +104,7 @@ const SignUp = () => {
             onChangeText={setPassword}
             onSubmitEditing={handleSignUp}
             style={styles.input}
-            placeholderTextColor="#9ca3af"
+            placeholderTextColor="#9a8e83"
           />
           <TouchableOpacity
             onPress={() => setIsPasswordVisible((prev) => !prev)}
@@ -112,7 +112,7 @@ const SignUp = () => {
             <MaterialIcons
               name={isPasswordVisible ? "visibility" : "visibility-off"}
               size={20}
-              color="#9ca3af"
+              color="#9a8e83"
             />
           </TouchableOpacity>
         </View>
@@ -145,7 +145,7 @@ export default SignUp;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: "#f7f2eb",
     justifyContent: "center",
     alignItems: "center",
     padding: 16,
@@ -155,27 +155,27 @@ const styles = StyleSheet.create({
     maxWidth: 400,
     padding: 24,
     borderRadius: 16,
-    backgroundColor: "#fff",
+    backgroundColor: "#fffdfa",
   },
   title: {
     fontSize: 24,
     fontWeight: "bold",
-    color: "#ec4899",
+    color: "#a65f65",
     textAlign: "center",
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: "#475569",
+    color: "#4a413a",
     textAlign: "center",
     marginBottom: 30,
   },
   inputWrapper: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#f9fafb",
+    backgroundColor: "#f8f4ee",
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: "#e9dfd3",
     paddingHorizontal: 12,
     borderRadius: 12,
     height: 50,
@@ -185,17 +185,17 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 16,
-    color: "#475569",
+    color: "#4a413a",
   },
   button: {
-    backgroundColor: "#ec4899",
+    backgroundColor: "#a65f65",
     paddingVertical: 15,
     borderRadius: 12,
     alignItems: "center",
     marginTop: 10,
   },
   disabledButton: {
-    backgroundColor: "#d1d5db",
+    backgroundColor: "#c8bdb2",
   },
   buttonText: {
     color: "#fff",
@@ -205,11 +205,11 @@ const styles = StyleSheet.create({
   loginText: {
     textAlign: "center",
     marginTop: 20,
-    color: "#475569",
+    color: "#4a413a",
     fontSize: 14,
   },
   link: {
-    color: "#ec4899",
+    color: "#a65f65",
     fontWeight: "600",
   },
 });

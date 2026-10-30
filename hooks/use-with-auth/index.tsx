@@ -1,62 +1,31 @@
-import { useRouter } from "expo-router";
+﻿import { supabase } from "@/utils/supabase";
+import { useRouter } from "@/navigation/router-compat";
 import React, { useEffect, useState } from "react";
-import { getAuth, onAuthStateChanged, User } from "firebase/auth";
-import { app } from "@/utils/firebase";
-import { checkPairingStatus } from "@/utils/firebase-functions/check-pair-status";
 
-const withAuth = <P extends object>(
-  WrappedComponent: React.ComponentType<P>
-): React.FC<P> => {
+const withAuth = <P extends object>(WrappedComponent: React.ComponentType<P>): React.FC<P> => {
   const AuthComponent: React.FC<P> = (props) => {
-    const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(
-      null
-    );
+    const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
     const router = useRouter();
-    const auth = getAuth(app);
 
     useEffect(() => {
-      let unsubscribe: () => void;
+      let mounted = true;
+      supabase.auth.getSession().then(({ data }) => {
+        if (!mounted) return;
+        const authenticated = !!data.session;
+        setIsAuthenticated(authenticated);
+        if (authenticated) router.replace("/(tabs)/Home");
+      });
+      const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+        if (!mounted) return;
+        setIsAuthenticated(!!session);
+        if (session) router.replace("/(tabs)/Home");
+      });
+      return () => { mounted = false; listener.subscription.unsubscribe(); };
+    }, [router]);
 
-      const checkAuthState = async () => {
-        // First try to get current user immediately
-        const user = auth.currentUser;
-        const { isPaired, partnerData } = await checkPairingStatus();
-        if (user && isPaired) {
-          setIsAuthenticated(true);
-          router.replace("/(tabs)/Home"); // Redirect to home if logged in
-          return;
-        } else if (user && !isPaired) {
-          router.replace("/(tabs)/viewReq");
-        }
-
-        // Set up listener for auth changes
-        unsubscribe = onAuthStateChanged(auth, (user: User | null) => {
-          if (user) {
-            setIsAuthenticated(true);
-            router.replace("/(tabs)/Home"); // Redirect to home if logged in
-          } else {
-            setIsAuthenticated(false);
-            // Don't redirect, just return null (shows the login screen)
-          }
-        });
-      };
-
-      checkAuthState();
-
-      return () => {
-        if (unsubscribe) unsubscribe();
-      };
-    }, []);
-
-    // Return null while checking auth or if not authenticated
-    if (isAuthenticated === null || isAuthenticated) {
-      return null;
-    }
-
-    // Only render the wrapped component if not authenticated
+    if (isAuthenticated !== false) return null;
     return <WrappedComponent {...props} />;
   };
-
   return AuthComponent;
 };
 

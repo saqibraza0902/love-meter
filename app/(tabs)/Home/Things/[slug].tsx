@@ -1,12 +1,5 @@
-import { db } from "@/utils/firebase";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import {
-  collection,
-  getDocs,
-  query,
-  Timestamp,
-  where,
-} from "firebase/firestore";
+﻿import { getPublicMediaUrl, supabase } from "@/utils/supabase";
+import { useLocalSearchParams, useRouter } from "@/navigation/router-compat";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -19,9 +12,10 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import ScreenBackButton from "@/components/ScreenBackButton";
 export type TThing = {
   id: string;
-  createdAt: Timestamp;
+  createdAt: string;
   description: string | null;
   imageUrl: string;
   link: string;
@@ -40,15 +34,13 @@ const Details = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const q = query(collection(db, "ttdt"), where("slug", "==", slug));
-        const snapshot = await getDocs(q);
-        const data = snapshot.docs.map(
-          (doc) =>
-            ({
-              id: doc.id,
-              ...doc.data(),
-            } as TThing)
-        );
+        const { data: rows, error } = await supabase.from("things_to_do").select("*").eq("slug", slug).order("created_at", { ascending: false });
+        if (error) throw error;
+        const data = (rows || []).map((row) => ({
+          id: row.id, createdAt: row.created_at, description: row.description,
+          imageUrl: row.image_path ? getPublicMediaUrl(row.image_path) : "",
+          link: row.link, slug: row.slug, title: row.title,
+        } as TThing));
         setItems(data);
 
         // Create refs for animation
@@ -78,11 +70,12 @@ const Details = () => {
   return (
     <SafeAreaView>
       <View style={styles.container}>
+        <ScreenBackButton label="Together" />
         <Text style={styles.title}>Items for: {slug}</Text>
 
         {loading ? (
           <View style={{ height: "100%" }}>
-            <ActivityIndicator size="large" color="#f472b6" />
+            <ActivityIndicator size="large" color="#a65f65" />
           </View>
         ) : (
           <FlatList
@@ -111,14 +104,14 @@ const Details = () => {
                     />
                   )}
                   <Text style={styles.memoryDate}>
-                    {item.createdAt.toDate().toLocaleDateString() || "No Date"}
+                    {new Date(item.createdAt).toLocaleDateString() || "No Date"}
                   </Text>
                   <Text style={styles.memoryText}>{item.title}</Text>
                   {item.description && (
                     <Text style={styles.memoryText}>{item.description}</Text>
                   )}
                   {item.link && (
-                    <Text style={[styles.memoryText, { color: "#3b82f6" }]}>
+                    <Text style={[styles.memoryText, { color: "#6d8777" }]}>
                       {item.link}
                     </Text>
                   )}
@@ -150,23 +143,23 @@ const Details = () => {
 export default Details;
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: "#fff1f2",
+    backgroundColor: "#f7f2eb",
     padding: 20,
     height: "100%",
   },
   title: {
     fontSize: 26,
     fontWeight: "bold",
-    color: "#ec4899",
+    color: "#a65f65",
     marginBottom: 20,
     textAlign: "center",
   },
   memoryCard: {
-    backgroundColor: "#fdf2f8",
+    backgroundColor: "#fcf5f2",
     padding: 18,
     marginBottom: 16,
     borderRadius: 20,
-    shadowColor: "#ec4899",
+    shadowColor: "#a65f65",
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.25,
     shadowRadius: 10,
@@ -184,16 +177,16 @@ const styles = StyleSheet.create({
   memoryDate: {
     fontSize: 16,
     fontWeight: "bold",
-    color: "#ec4899",
+    color: "#a65f65",
     marginBottom: 4,
   },
   memoryText: {
     fontSize: 14,
-    color: "#4b5563",
+    color: "#4a413a",
   },
   addButton: {
     marginTop: 10,
-    backgroundColor: "#ec4899",
+    backgroundColor: "#a65f65",
     borderRadius: 12,
     paddingVertical: 15,
   },
@@ -207,6 +200,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 50,
     fontSize: 16,
-    color: "#9ca3af",
+    color: "#9a8e83",
   },
 });

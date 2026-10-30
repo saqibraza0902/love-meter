@@ -1,246 +1,69 @@
-import React, { useEffect, useRef } from "react";
-import {
-  StyleSheet,
-  Text,
-  View,
-  ScrollView,
-  TouchableOpacity,
-  Dimensions,
-} from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import Animated, {
-  FadeIn,
-  FadeInDown,
-  FadeInUp,
-  Layout,
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  withRepeat,
-  withSequence,
-  Easing,
-} from "react-native-reanimated";
-import { useRouter } from "expo-router";
+﻿import Ionicons from "react-native-vector-icons/Ionicons";
+import { useRouter } from "@/navigation/router-compat";
+import React from "react";
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import ScreenBackButton from "@/components/ScreenBackButton";
 
-const { width } = Dimensions.get("window");
-const CARD_WIDTH = width * 0.85;
-const CARD_MARGIN = width * 0.05;
-
-// Using only the specified colors for boxes
-const boxColors = [
-  "#f8a5d1", // Darker version of #fbc2eb
-  "#f87fa6", // Darker version of #f78ca0
-  "#f9b8d4", // Darker version of #fccde2
-  "#d95d8f", // Darker version of #fddde6
-  "#f5b1ce", // Darker version of #f8c6d8
+const categories: { title: string; description: string; icon: string; slug: string; tint: string }[] = [
+  { title: "Travel", description: "Plan a little escape", icon: "airplane-outline", slug: "travel", tint: "#f2e8d8" },
+  { title: "Movie nights", description: "Pick something to watch", icon: "film-outline", slug: "watch-movies", tint: "#f0dfdc" },
+  { title: "Cook together", description: "Find a recipe to try", icon: "restaurant-outline", slug: "cook-together", tint: "#e8eee7" },
+  { title: "Explore nature", description: "Get outside together", icon: "leaf-outline", slug: "explore-nature", tint: "#e8eee7" },
+  { title: "Read together", description: "Start a tiny book club", icon: "book-outline", slug: "read-books", tint: "#f2e8d8" },
+  { title: "Home projects", description: "Make your space yours", icon: "home-outline", slug: "home-projects", tint: "#f0dfdc" },
+  { title: "Dream dates", description: "Turn an idea into a plan", icon: "heart-outline", slug: "dream-date", tint: "#f0dfdc" },
+  { title: "Something else", description: "Browse more ideas", icon: "sparkles-outline", slug: "others", tint: "#f2e8d8" },
 ];
 
-// Repeating colors if we have more categories than colors
-const categories = [
-  { title: "Travel Adventures", icon: "airplane", slug: "travel" },
-  { title: "Movie Nights", icon: "film", slug: "watch-movies" },
-  { title: "Cooking Together", icon: "restaurant", slug: "cook-together" },
-  { title: "Nature Exploration", icon: "leaf", slug: "explore-nature" },
-  { title: "Book Club", icon: "book", slug: "read-books" },
-  { title: "Home Projects", icon: "home", slug: "home-projects" },
-  { title: "Dream Dates", icon: "heart", slug: "dream-date" },
-  { title: "Other Activities", icon: "ellipsis-horizontal", slug: "others" },
-].map((item, index) => ({
-  ...item,
-  color: boxColors[index % boxColors.length], // Cycle through the specified colors
-}));
-
-type Category = {
-  title: string;
-  icon: string | any;
-  slug: string;
-  color: string;
-};
-type CategoryCardProps = {
-  item: Category;
-  index: number;
-  pulse: Animated.SharedValue<number>;
-  onUserInteraction: () => void;
-};
-
-const CategoryCard: React.FC<CategoryCardProps> = ({
-  item,
-  index,
-  pulse,
-  onUserInteraction,
-}) => {
-  const router = useRouter();
-  const scale = useSharedValue(1);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value * pulse.value }],
-  }));
-
-  const handlePressIn = () => {
-    scale.value = withTiming(0.95, { duration: 100 });
-    onUserInteraction();
-  };
-
-  const handlePressOut = () => {
-    scale.value = withTiming(1, { duration: 100 });
-  };
-
-  return (
-    <Animated.View
-      entering={FadeInUp.delay(index * 100).duration(600)}
-      layout={Layout.springify().mass(0.6)}
-      style={styles.cardWrapper}
-    >
-      <TouchableOpacity
-        activeOpacity={0.9}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        onPress={() => router.push(`/(tabs)/Home/Things/${item.slug}`)}
-      >
-        <Animated.View
-          style={[styles.card, animatedStyle, { backgroundColor: item.color }]}
-        >
-          <View style={styles.cardContent}>
-            <Ionicons
-              name={item.icon}
-              size={40}
-              color="white"
-              style={styles.cardIcon}
-            />
-            <Text style={styles.cardText}>{item.title}</Text>
-          </View>
-        </Animated.View>
-      </TouchableOpacity>
-    </Animated.View>
-  );
-};
-
 const Things = () => {
-  const pulse = useSharedValue(1);
-  const inactivityTimeout = useRef<NodeJS.Timeout | null>(null);
-
-  const resetPulse = () => {
-    pulse.value = 1;
-  };
-
-  const triggerPulse = () => {
-    pulse.value = withRepeat(
-      withSequence(
-        withTiming(1.03, { duration: 800, easing: Easing.ease }),
-        withTiming(1, { duration: 800, easing: Easing.ease })
-      ),
-      -1,
-      true
-    );
-  };
-
-  const resetInactivityTimer = () => {
-    if (inactivityTimeout.current) {
-      clearTimeout(inactivityTimeout.current);
-    }
-    resetPulse();
-    inactivityTimeout.current = setTimeout(() => {
-      triggerPulse();
-    }, 8000);
-  };
-
-  useEffect(() => {
-    resetInactivityTimer();
-    return () => {
-      if (inactivityTimeout.current) clearTimeout(inactivityTimeout.current);
-    };
-  }, []);
+  const router = useRouter();
 
   return (
-    <View style={styles.container}>
-      <Animated.View
-        entering={FadeIn.duration(500)}
-        layout={Layout.duration(300)}
-      >
-        <Animated.Text entering={FadeInDown.duration(700)} style={styles.title}>
-          Together Activities
-        </Animated.Text>
-        <Text style={styles.subtitle}>Create beautiful memories together</Text>
+    <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <ScreenBackButton label="Home" />
+        <Text style={styles.eyebrow}>MAKE TIME FOR EACH OTHER</Text>
+        <Text style={styles.title}>Things to do together</Text>
+        <Text style={styles.subtitle}>Choose a mood and find a simple idea you can make your own.</Text>
 
-        <ScrollView
-          contentContainerStyle={styles.scrollContainer}
-          showsVerticalScrollIndicator={false}
-        >
-          {categories.map((item, index) => (
-            <CategoryCard
-              key={item.title}
-              item={item}
-              index={index}
-              pulse={pulse}
-              onUserInteraction={resetInactivityTimer}
-            />
+        <View style={styles.grid}>
+          {categories.map((item) => (
+            <TouchableOpacity
+              key={item.slug}
+              style={styles.card}
+              onPress={() => router.push(`/(tabs)/Home/Things/${item.slug}`)}
+              activeOpacity={0.82}
+            >
+              <View style={[styles.iconTile, { backgroundColor: item.tint }]}>
+                <Ionicons name={item.icon} size={23} color="#73585a" />
+              </View>
+              <Text style={styles.cardTitle}>{item.title}</Text>
+              <Text style={styles.cardDescription}>{item.description}</Text>
+              <Ionicons name="arrow-forward" size={16} color="#9a8e83" style={styles.arrow} />
+            </TouchableOpacity>
           ))}
-        </ScrollView>
-      </Animated.View>
-    </View>
+        </View>
+        <View style={styles.note}><Ionicons name="heart-outline" size={16} color="#a65f65" /><Text style={styles.noteText}>Small plans can become favorite memories.</Text></View>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
 export default Things;
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "white",
-    paddingTop: 60,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: "800",
-    color: "#333",
-    marginBottom: 8,
-    textAlign: "center",
-  },
-  subtitle: {
-    fontSize: 16,
-    color: "#666",
-    textAlign: "center",
-    marginBottom: 30,
-    fontWeight: "500",
-  },
-  scrollContainer: {
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingBottom: 40,
-  },
-  cardWrapper: {
-    width: CARD_WIDTH,
-
-    marginBottom: 20,
-  },
-  card: {
-    width: "100%",
-    height: 140,
-    borderRadius: 24,
-    justifyContent: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 5 },
-    elevation: 5,
-  },
-  cardContent: {
-    padding: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    height: "100%",
-  },
-  cardIcon: {
-    marginBottom: 15,
-  },
-  cardText: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "white",
-    textAlign: "center",
-    textShadowColor: "rgba(0,0,0,0.2)",
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
-  },
+  container: { flex: 1, backgroundColor: "#f7f2eb" },
+  content: { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 28 },
+  eyebrow: { color: "#8a7770", fontSize: 10, fontWeight: "800", letterSpacing: 1.4, marginTop: 6 },
+  title: { color: "#3f3832", fontSize: 26, fontWeight: "800", marginTop: 6 },
+  subtitle: { color: "#82766d", fontSize: 13, lineHeight: 20, marginTop: 7, marginBottom: 18 },
+  grid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between" },
+  card: { width: "48.3%", minHeight: 145, backgroundColor: "#fffdfa", borderRadius: 19, borderColor: "#e9dfd3", borderWidth: 1, padding: 14, marginBottom: 11 },
+  iconTile: { width: 42, height: 42, borderRadius: 14, alignItems: "center", justifyContent: "center", marginBottom: 11 },
+  cardTitle: { color: "#4a413a", fontSize: 14, fontWeight: "700" },
+  cardDescription: { color: "#82766d", fontSize: 11, lineHeight: 16, marginTop: 4, paddingRight: 4 },
+  arrow: { position: "absolute", right: 13, top: 14 },
+  note: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, marginTop: 3 },
+  noteText: { color: "#82766d", fontSize: 11 },
 });

@@ -1,7 +1,7 @@
-import { StyleSheet, Text, View, Animated, Easing } from "react-native";
+﻿import { StyleSheet, Text, View, Animated, Easing } from "react-native";
 import React, { useEffect, useRef } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { useRouter } from "@/navigation/router-compat";
 import withAuth from "@/hooks/use-with-auth";
 
 const OnBoarding = () => {

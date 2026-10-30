@@ -1,86 +1,51 @@
-import { useAppSelector } from "@/hooks/use-redux";
+﻿import { useAppSelector } from "@/hooks/use-redux";
 import { useToast } from "@/providers/toast-provider";
-import { db } from "@/utils/firebase";
-import { uploadImageAsync } from "@/utils/firebase-functions/upload-img";
-import { Ionicons } from "@expo/vector-icons";
-import * as ImagePicker from "expo-image-picker";
-import { LinearGradient } from "expo-linear-gradient";
-import {
-  addDoc,
-  arrayUnion,
-  collection,
-  doc,
-  getDocs,
-  query,
-  updateDoc,
-  where,
-} from "firebase/firestore";
+import { getMediaUrl, supabase, uploadImage } from "@/utils/supabase";
+import Ionicons from "react-native-vector-icons/Ionicons";
+import * as ImagePicker from "@/utils/image-picker-compat";
+import { LinearGradient } from "react-native-linear-gradient";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Dimensions,
   FlatList,
   Image,
   Modal,
   Pressable,
   ScrollView,
   StyleSheet,
+  StatusBar,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import { Calendar } from "react-native-calendars";
-
-const HEIGHT = Dimensions.get("window").height;
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import ScreenBackButton from "@/components/ScreenBackButton";
 
 async function uploadMemory(
-  users: string[],
+  coupleId: string,
+  userId: string,
   date: string,
   text: string,
   imageUrl: string
 ) {
-  try {
-    const docQuery = query(
-      collection(db, "memories"),
-      where("users", "array-contains-any", users)
-    );
-    const querySnapshot = await getDocs(docQuery);
-    const docSnap = querySnapshot.docs[0];
-    const newMemory = { date, text, image: imageUrl };
-
-    if (docSnap?.exists()) {
-      const docRef = doc(db, "memories", docSnap.id);
-      await updateDoc(docRef, {
-        memories: arrayUnion(newMemory),
-      });
-    } else {
-      await addDoc(collection(db, "memories"), {
-        users: users,
-        memories: [newMemory],
-      });
-    }
-  } catch (error) {
-    console.error("Error adding memory:", error);
-    throw error;
-  }
+  const { error } = await supabase.from("memories").insert({
+    couple_id: coupleId, created_by: userId, memory_date: date, text, image_path: imageUrl,
+  });
+  if (error) throw error;
 }
 
-async function fetchMemories(users: string[]) {
-  try {
-    const memoriesQuery = query(
-      collection(db, "memories"),
-      where("users", "array-contains-any", users)
-    );
-    const memoriesSnapshot = await getDocs(memoriesQuery);
-    const memoriesObj = memoriesSnapshot?.docs[0];
-    return {
-      memories: memoriesObj?.data()?.memories,
-      id: memoriesObj?.id,
-    };
-  } catch (error) {
-    console.log(error);
-  }
+async function fetchMemories(coupleId?: string) {
+  if (!coupleId) return { memories: [] };
+  const { data, error } = await supabase.from("memories").select("*")
+    .eq("couple_id", coupleId).order("memory_date", { ascending: false });
+  if (error) throw error;
+  const memories = await Promise.all((data || []).map(async (item) => ({
+    date: item.memory_date, text: item.text,
+    image: item.image_path ? await getMediaUrl(item.image_path) : "",
+  })));
+  return { memories };
 }
 
 const CalendarScreen = () => {
@@ -97,31 +62,19 @@ const CalendarScreen = () => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const { toast } = useToast();
   const [fullImageVisible, setFullImageVisible] = useState(false);
+  const { top } = useSafeAreaInsets();
 
-  const users = [user?.id || "", partner?.id || ""];
-  const currentDate = new Date();
-  const month = currentDate.toLocaleString("default", { month: "short" });
-  const day = currentDate.getDate();
-  const year = currentDate.getFullYear();
-
-  // Gradient colors matching the HomeScreen
-  const gradientColors: [string, string] = ["#f78ca0", "#fbc2eb"];
-  const cardGradients: [string, string][] = [
-    ["#fbc2eb", "#f78ca0"],
-    ["#fccde2", "#fddde6"],
-    ["#f8c6d8", "#fbc2eb"],
-    ["#f78ca0", "#fccde2"],
-  ];
+  const gradientColors: [string, string] = ["#a65f65", "#f0dfdc"];
 
   useEffect(() => {
     loadMemories();
-  }, []);
+  }, [user?.coupleId]);
 
   const loadMemories = async () => {
     setLoading(true);
-    const data = await fetchMemories(users);
-    setMemories(data);
-    setLoading(false);
+    try { const data = await fetchMemories(user?.coupleId); setMemories(data); }
+    catch (error) { console.warn("Could not load memories", error); }
+    finally { setLoading(false); }
   };
 
   const handleDayPress = (day: any) => {
@@ -131,14 +84,13 @@ const CalendarScreen = () => {
   };
 
   const pickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      base64: false,
-      quality: 0.7,
-    });
-
-    if (!result.canceled && result.assets.length > 0) {
-      const asset = result.assets[0];
-      setMemoryImage(asset.uri);
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) return toast("Allow photo library access to add a memory image.");
+      const result = await ImagePicker.launchImageLibraryAsync({ base64: false, quality: 0.7 });
+      if (!result.canceled && result.assets.length > 0) setMemoryImage(result.assets[0].uri || null);
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "Couldn't open your photo library.");
     }
   };
 
@@ -153,8 +105,9 @@ const CalendarScreen = () => {
 
     try {
       setUploading(true);
-      const imageUrl = await uploadImageAsync(memoryImage, setUploadProgress);
-      await uploadMemory(users, selectedDate!, memoryText, imageUrl);
+      if (!user?.id || !user.coupleId) throw new Error("Pair your account before adding memories.");
+      const imageUrl = await uploadImage(memoryImage, `${user.coupleId}/memories/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`, "private-media", setUploadProgress);
+      await uploadMemory(user.coupleId, user.id, selectedDate!, memoryText, imageUrl);
       toast("Memory saved successfully!");
 
       setModalVisible(false);
@@ -163,21 +116,24 @@ const CalendarScreen = () => {
       setUploadProgress(0);
       loadMemories();
     } catch (error) {
-      toast("Failed to save memory. Please try again.");
+      console.error("Could not save memory", error);
+      toast(error instanceof Error ? error.message : "Failed to save memory. Please try again.");
     } finally {
       setUploading(false);
     }
   };
 
   return (
-    <LinearGradient colors={["#f8fafc", "#fff1f2"]} style={styles.container}>
+    <LinearGradient colors={["#f7f2eb", "#f7f2eb"]} style={styles.container}>
+      <StatusBar barStyle="light-content" />
       {/* Header with Gradient */}
       <LinearGradient
-        colors={["#3d0c1f", "#d73772"]}
+        colors={["#a65f65", "#bd8078"]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={styles.header}
+        style={[styles.header, { paddingTop: top + 16 }]}
       >
+        <ScreenBackButton label="Home" light />
         <View style={styles.headerContent}>
           <View style={styles.headerTextContainer}>
             <Text style={styles.headerTitle}>Memory Lane</Text>
@@ -213,7 +169,7 @@ const CalendarScreen = () => {
       {/* Memories List */}
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#f472b6" />
+          <ActivityIndicator size="large" color="#a65f65" />
         </View>
       ) : (
         <FlatList
@@ -222,12 +178,7 @@ const CalendarScreen = () => {
           showsVerticalScrollIndicator={false}
           keyExtractor={(item, index) => index.toString()}
           renderItem={({ item, index }) => (
-            <LinearGradient
-              colors={cardGradients[index % cardGradients.length]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.memoryCard}
-            >
+            <View style={styles.memoryCard}>
               <TouchableOpacity
                 onPress={() => {
                   setSelectedImageUri(item.image);
@@ -241,11 +192,11 @@ const CalendarScreen = () => {
               </TouchableOpacity>
               <Text style={styles.memoryDate}>{item.date}</Text>
               <Text style={styles.memoryText}>{item.text}</Text>
-            </LinearGradient>
+            </View>
           )}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Ionicons name="images" size={48} color="#fbcfe8" />
+              <Ionicons name="images-outline" size={48} color="#e2c5c1" />
               <Text style={styles.noMemoryText}>
                 No memories yet. Start adding some!
               </Text>
@@ -286,7 +237,7 @@ const CalendarScreen = () => {
       <Modal visible={calendarVisible} transparent animationType="slide">
         <View style={styles.modalBackdrop}>
           <LinearGradient
-            colors={["#fdf2f8", "#fce7f3"]}
+            colors={["#fcf5f2", "#f0dfdc"]}
             style={styles.modalContainer}
           >
             <Text style={styles.modalTitle}>Select a Date</Text>
@@ -295,14 +246,14 @@ const CalendarScreen = () => {
                 current={new Date().toISOString().split("T")[0]}
                 onDayPress={handleDayPress}
                 theme={{
-                  selectedDayBackgroundColor: "#ec4899",
-                  todayTextColor: "#ec4899",
+                  selectedDayBackgroundColor: "#a65f65",
+                  todayTextColor: "#a65f65",
                   textDayFontWeight: "600",
                   textMonthFontWeight: "bold",
                   textDayHeaderFontWeight: "600",
-                  arrowColor: "#ec4899",
+                  arrowColor: "#a65f65",
                   textDisabledColor: "#cbd5e1",
-                  dotColor: "#ec4899",
+                  dotColor: "#a65f65",
                   selectedDotColor: "#fff",
                 }}
                 style={styles.calendar}
@@ -312,7 +263,7 @@ const CalendarScreen = () => {
               style={styles.closeButton}
               onPress={() => setCalendarVisible(false)}
             >
-              <Ionicons name="close" size={24} color="#64748b" />
+              <Ionicons name="close" size={24} color="#82766d" />
             </TouchableOpacity>
           </LinearGradient>
         </View>
@@ -322,7 +273,7 @@ const CalendarScreen = () => {
       <Modal visible={modalVisible} transparent animationType="slide">
         <View style={styles.modalBackdrop}>
           <LinearGradient
-            colors={["#fdf2f8", "#fce7f3"]}
+            colors={["#fcf5f2", "#f0dfdc"]}
             style={styles.memoryModalContainer}
           >
             <ScrollView
@@ -336,7 +287,7 @@ const CalendarScreen = () => {
                   <Image source={{ uri: memoryImage }} style={styles.image} />
                 ) : (
                   <View style={styles.imagePlaceholder}>
-                    <Ionicons name="image" size={48} color="#fbcfe8" />
+                    <Ionicons name="image-outline" size={48} color="#e2c5c1" />
                     <Text style={styles.placeholderText}>Select Image</Text>
                   </View>
                 )}
@@ -344,7 +295,7 @@ const CalendarScreen = () => {
 
               <TextInput
                 placeholder="Write a short memory (20 words max)"
-                placeholderTextColor="#9ca3af"
+                placeholderTextColor="#9a8e83"
                 value={memoryText}
                 onChangeText={setMemoryText}
                 multiline
@@ -411,12 +362,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    paddingTop: 60,
+    paddingTop: 16,
     paddingBottom: 30,
     paddingHorizontal: 25,
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
-    shadowColor: "#FF6B6B",
+    shadowColor: "#795856",
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.3,
     shadowRadius: 20,
@@ -499,6 +450,9 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   memoryCard: {
+    backgroundColor: "#fffdfa",
+    borderWidth: 1,
+    borderColor: "#e9dfd3",
     padding: 20,
     marginBottom: 20,
     borderRadius: 24,
@@ -518,7 +472,7 @@ const styles = StyleSheet.create({
   memoryDate: {
     fontSize: 16,
     fontWeight: "700",
-    color: "white",
+    color: "#a65f65",
     marginBottom: 8,
     textShadowColor: "rgba(0,0,0,0.2)",
     textShadowOffset: { width: 1, height: 1 },
@@ -526,7 +480,7 @@ const styles = StyleSheet.create({
   },
   memoryText: {
     fontSize: 15,
-    color: "white",
+    color: "#4a413a",
     lineHeight: 22,
     textShadowColor: "rgba(0,0,0,0.1)",
     textShadowOffset: { width: 1, height: 1 },
@@ -561,7 +515,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 20,
     fontSize: 16,
-    color: "#9ca3af",
+    color: "#9a8e83",
     fontWeight: "500",
   },
   loadingContainer: {
@@ -623,7 +577,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 24,
     fontWeight: "700",
-    color: "#1e293b",
+    color: "#3f3832",
     textAlign: "center",
     marginBottom: 24,
   },
@@ -634,7 +588,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     marginBottom: 24,
     borderWidth: 2,
-    borderColor: "#fbcfe8",
+    borderColor: "#e2c5c1",
     borderStyle: "dashed",
     overflow: "hidden",
     elevation: 3,
@@ -648,16 +602,16 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#f8fafc",
+    backgroundColor: "#f7f2eb",
   },
   placeholderText: {
     marginTop: 12,
-    color: "#9ca3af",
+    color: "#9a8e83",
     fontWeight: "500",
     fontSize: 16,
   },
   textInput: {
-    borderColor: "#fbcfe8",
+    borderColor: "#e2c5c1",
     borderWidth: 2,
     width: "100%",
     padding: 20,
@@ -666,7 +620,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     textAlignVertical: "top",
     backgroundColor: "#fff",
-    color: "#334155",
+    color: "#4a413a",
     fontSize: 16,
     elevation: 2,
   },
@@ -687,19 +641,19 @@ const styles = StyleSheet.create({
     minHeight: 56,
   },
   saveButton: {
-    backgroundColor: "#ec4899",
+    backgroundColor: "#a65f65",
   },
   cancelButton: {
-    backgroundColor: "#f8fafc",
+    backgroundColor: "#f7f2eb",
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: "#e9dfd3",
   },
   buttonText: {
     fontSize: 16,
     fontWeight: "600",
   },
   cancelButtonText: {
-    color: "#64748b",
+    color: "#82766d",
   },
   disabledButton: {
     opacity: 0.6,
@@ -711,19 +665,19 @@ const styles = StyleSheet.create({
   },
   progressContainer: {
     height: 8,
-    backgroundColor: "#e2e8f0",
+    backgroundColor: "#e9dfd3",
     borderRadius: 4,
     marginBottom: 24,
     overflow: "hidden",
   },
   progressBar: {
     height: "100%",
-    backgroundColor: "#ec4899",
+    backgroundColor: "#a65f65",
   },
   progressText: {
     textAlign: "center",
     marginBottom: 16,
-    color: "#64748b",
+    color: "#82766d",
     fontWeight: "500",
   },
 });

@@ -1,8 +1,9 @@
-import { useAppSelector } from "@/hooks/use-redux";
+﻿import { useAppSelector } from "@/hooks/use-redux";
 import { useToast } from "@/providers/toast-provider";
-import { db } from "@/utils/firebase";
-import { useRouter } from "expo-router";
-import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { supabase } from "@/utils/supabase";
+import { useRouter } from "@/navigation/router-compat";
+import Ionicons from "react-native-vector-icons/Ionicons";
+import ScreenBackButton from "@/components/ScreenBackButton";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -22,17 +23,27 @@ const QuizzesScreen = () => {
   const { user, partner } = useAppSelector((s) => s.user);
 
   useEffect(() => {
-    if (!user?.id) return;
-    const users = [user?.id, partner?.id].filter(Boolean);
-    const q1 = query(
-      collection(db, "quizzes"),
-      where("users", "array-contains-any", users)
-    );
-    const unsubscribe = onSnapshot(q1, async (snap) => {
-      setQuizzes(snap.docs.map((el) => ({ id: el.id, ...el.data() })));
-    });
-    return () => unsubscribe();
-  }, [user?.id]);
+    if (!user?.coupleId) { setQuizzes([]); setLoading(false); return; }
+    let active = true;
+    const load = async () => {
+      setLoading(true);
+      const { data, error } = await supabase.from("quizzes").select("*, quiz_attempts(user_id,submitted_at)")
+        .eq("couple_id", user.coupleId).order("created_at", { ascending: false });
+      if (error) { toast("Could not load quizzes."); console.warn(error); }
+      else if (active) setQuizzes((data || []).map((quiz: any) => ({
+        ...quiz,
+        creatorId: quiz.creator_id,
+        status: (quiz.quiz_attempts || []).some((attempt: any) => attempt.user_id === partner?.id && !!attempt.submitted_at),
+      })));
+      if (active) setLoading(false);
+    };
+    void load();
+    const channel = supabase.channel(`quizzes:${user.coupleId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "quizzes", filter: `couple_id=eq.${user.coupleId}` }, () => void load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "quiz_attempts" }, () => void load())
+      .subscribe();
+    return () => { active = false; void supabase.removeChannel(channel); };
+  }, [user?.coupleId, partner?.id, toast]);
 
   const renderQuizItem = ({ item }: { item: any }) => {
     const isCreatedByUser = item.creatorId === user?.id;
@@ -61,7 +72,7 @@ const QuizzesScreen = () => {
           <View
             style={[
               styles.statusBadge,
-              { backgroundColor: item.status ? "#4ade80" : "#fbbf24" },
+              { backgroundColor: item.status ? "#7c9b83" : "#fbbf24" },
             ]}
           >
             <Text style={styles.statusText}>
@@ -81,11 +92,14 @@ const QuizzesScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.heading}>Your Quizzes</Text>
+      <View style={styles.headingRow}>
+        <ScreenBackButton label="Home" />
+        <Text style={styles.heading}>Your quizzes</Text>
+      </View>
 
       {loading ? (
         <View style={styles.loaderContainer}>
-          <ActivityIndicator size="large" color="#ec4899" />
+          <ActivityIndicator size="large" color="#a65f65" />
         </View>
       ) : (
         <FlatList
@@ -93,9 +107,13 @@ const QuizzesScreen = () => {
           keyExtractor={(item) => item.id}
           renderItem={renderQuizItem}
           ListEmptyComponent={
-            <Text style={styles.emptyText}>No quizzes available.</Text>
+            <View style={styles.emptyState}>
+              <View style={styles.emptyIcon}><Ionicons name="help-circle-outline" size={28} color="#a65f65" /></View>
+              <Text style={styles.emptyTitle}>Start with a question</Text>
+              <Text style={styles.emptyText}>Make a short quiz for your partner and see what you both remember.</Text>
+            </View>
           }
-          contentContainerStyle={{ paddingBottom: 100 }}
+          contentContainerStyle={{ paddingBottom: 100, flexGrow: 1 }}
         />
       )}
 
@@ -104,7 +122,8 @@ const QuizzesScreen = () => {
         onPress={() => router.push("/(tabs)/Home/Quizzes/CreateQuiz")}
         disabled={loading}
       >
-        <Text style={styles.buttonText}>Create New Quiz</Text>
+        <Ionicons name="add-circle-outline" size={20} color="#fffdfa" />
+        <Text style={styles.buttonText}>{quizzes.length ? "Create a quiz" : "Create your first quiz"}</Text>
       </TouchableOpacity>
     </SafeAreaView>
   );
@@ -113,15 +132,17 @@ const QuizzesScreen = () => {
 export default QuizzesScreen;
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16, backgroundColor: "#fff" },
+  container: { flex: 1, padding: 18, backgroundColor: "#f7f2eb" },
   heading: {
     fontSize: 22,
     fontWeight: "bold",
-    marginBottom: 16,
-    color: "#111827",
+    marginTop: 2,
+    marginBottom: 14,
+    color: "#3f3832",
   },
+  headingRow: { marginBottom: 2 },
   button: {
-    backgroundColor: "#ec4899",
+    backgroundColor: "#a65f65",
     padding: 16,
     borderRadius: 14,
     position: "absolute",
@@ -129,9 +150,13 @@ const styles = StyleSheet.create({
     left: 20,
     right: 20,
     elevation: 2,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
   },
   disabledButton: {
-    backgroundColor: "#f9a8d4",
+    backgroundColor: "#e2c5c1",
   },
   buttonText: {
     color: "white",
@@ -149,24 +174,24 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
   },
   userQuiz: {
-    backgroundColor: "#fef2f2",
-    borderColor: "#fca5a5",
+    backgroundColor: "#fcf5f2",
+    borderColor: "#e2c5c1",
     borderWidth: 1,
   },
   partnerQuiz: {
-    backgroundColor: "#f9fafb",
-    borderColor: "#e5e7eb",
+    backgroundColor: "#fffdfa",
+    borderColor: "#e9dfd3",
     borderWidth: 1,
   },
   quizTitle: {
     fontSize: 16,
     fontWeight: "bold",
-    color: "#111827",
+    color: "#3f3832",
   },
   meta: {
     marginTop: 6,
     fontSize: 13,
-    color: "#6b7280",
+    color: "#82766d",
   },
   headerRow: {
     flexDirection: "row",
@@ -184,11 +209,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   emptyText: {
-    textAlign: "center",
-    marginTop: 40,
-    color: "#9ca3af",
-    fontSize: 16,
+    textAlign: "center", color: "#82766d", fontSize: 13, lineHeight: 19, marginTop: 6,
   },
+  emptyState: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 30, paddingBottom: 70 },
+  emptyIcon: { width: 58, height: 58, borderRadius: 20, backgroundColor: "#f0dfdc", alignItems: "center", justifyContent: "center", marginBottom: 12 },
+  emptyTitle: { color: "#4a413a", fontSize: 16, fontWeight: "700" },
   loaderContainer: {
     flex: 1,
     justifyContent: "center",

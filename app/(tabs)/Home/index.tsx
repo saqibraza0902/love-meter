@@ -1,149 +1,175 @@
-import { useAppSelector } from "@/hooks/use-redux";
-import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
+﻿import { useAppSelector } from "@/hooks/use-redux";
+import Ionicons from "react-native-vector-icons/Ionicons";
+import { LinearGradient } from "react-native-linear-gradient";
+import { useRouter } from "@/navigation/router-compat";
 import React from "react";
-import {
-  StatusBar,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
-import {
-  SafeAreaView,
-  useSafeAreaInsets,
-} from "react-native-safe-area-context";
+import { ActivityIndicator, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+
+const features: { title: string; subtitle: string; icon: string; route: string; tint: string }[] = [
+  { title: "Chat", subtitle: "Stay close, every day", icon: "chatbubble-ellipses-outline", route: "/(tabs)/Home/Chats", tint: "#e8eee7" },
+  { title: "Quizzes", subtitle: "See how well you know each other", icon: "help-circle-outline", route: "/(tabs)/Home/Quizzes", tint: "#f0dfdc" },
+  { title: "Memories", subtitle: "Keep your moments together", icon: "images-outline", route: "/(tabs)/Home/Memories", tint: "#f2e8d8" },
+  { title: "Things to do", subtitle: "Make a little time for two", icon: "calendar-outline", route: "/(tabs)/Home/Things", tint: "#e8eee7" },
+  { title: "Relationship guide", subtitle: "Thoughtful ideas for both of you", icon: "sparkles-outline", route: "/(tabs)/Home/AIHelp", tint: "#f0dfdc" },
+];
 
 const HomeScreen = () => {
   const router = useRouter();
-  const { user, partner } = useAppSelector((s) => s.user);
-
+  const { user, partner } = useAppSelector((state) => state.user);
   const { top } = useSafeAreaInsets();
-  const features = [
-    { title: "Chat", icon: "chatbubble-ellipses", route: "/(tabs)/Home/Chats" },
-    { title: "Quizzes", icon: "bulb", route: "/(tabs)/Home/Quizzes" },
-    { title: "Memories", icon: "images", route: "/(tabs)/Home/Memories" },
-    { title: "Together", icon: "people", route: "/(tabs)/Home/Things" },
-    { title: "AI Help", icon: "sparkles", route: "/(tabs)/Home/Calendar" },
-  ];
+  const paired = !!user?.isPaired && !!partner;
 
-  const gradientCardColors = [
-    "#f8ccd8",
-    "#f28ca0",
-    "#fccde2",
-    "#fddde6",
-    "#f8c6d8",
-  ];
+  if (!user || (user.isPaired && !partner)) {
+    return <SafeAreaView style={styles.loadingScreen}><ActivityIndicator size="small" color="#a65f65" /></SafeAreaView>;
+  }
 
-  if (!user?.isPaired) {
+  if (!paired) {
     return (
-      <SafeAreaView style={styles.center}>
-        <Text style={{ color: "#ec4899" }}>User is not paired</Text>
+      <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
+        <StatusBar barStyle="dark-content" />
+        <ScrollView contentContainerStyle={styles.onboardingContent} showsVerticalScrollIndicator={false}>
+          <View style={styles.onboardingTop}>
+            <View style={styles.brandMark}><Ionicons name="heart" size={27} color="#a65f65" /></View>
+            <TouchableOpacity style={styles.onboardingSettings} onPress={() => router.push("/(tabs)/Settings")} accessibilityLabel="Open settings">
+              <Ionicons name="settings-outline" size={21} color="#6d8777" />
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.eyebrow}>A LITTLE SPACE FOR TWO</Text>
+          <Text style={styles.onboardingTitle}>Make this your place to grow closer.</Text>
+          <Text style={styles.onboardingCopy}>Connect with your partner to start a private space for messages, memories, quizzes, and plans together.</Text>
+
+          <View style={styles.previewCard}>
+            <View style={styles.avatarRow}>
+              <View style={[styles.avatar, styles.avatarRose]}><Ionicons name="person" size={23} color="#a65f65" /></View>
+              <View style={styles.connectionLine}><Ionicons name="heart" size={17} color="#a65f65" /></View>
+              <View style={[styles.avatar, styles.avatarSage]}><Ionicons name="person" size={23} color="#6d8777" /></View>
+            </View>
+            <Text style={styles.previewTitle}>Your shared space starts here</Text>
+            <Text style={styles.previewCopy}>Only you and your partner can see what you share.</Text>
+          </View>
+
+          <TouchableOpacity style={styles.primaryButton} onPress={() => router.push("/(tabs)/sendReq")} activeOpacity={0.85}>
+            <Ionicons name="heart-circle-outline" size={21} color="#fffdfa" />
+            <Text style={styles.primaryButtonText}>Connect with your partner</Text>
+            <Ionicons name="arrow-forward" size={18} color="#fffdfa" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.secondaryButton} onPress={() => router.push("/(tabs)/viewReq")} activeOpacity={0.8}>
+            <Ionicons name="mail-unread-outline" size={19} color="#6d8777" />
+            <Text style={styles.secondaryButtonText}>Check incoming requests</Text>
+          </TouchableOpacity>
+
+          <View style={styles.stepsRow}>
+            <Step number="1" label="Send an invite" />
+            <View style={styles.stepDivider} />
+            <Step number="2" label="They accept" />
+            <View style={styles.stepDivider} />
+            <Step number="3" label="Grow together" />
+          </View>
+        </ScrollView>
       </SafeAreaView>
     );
   }
 
+  const userName = user.name || user.email?.split("@")[0] || "You";
+  const partnerName = partner.name || partner.email?.split("@")[0] || "Your partner";
+
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["left", "right"]}>
       <StatusBar barStyle="light-content" />
-
-      {/* Header Section */}
-      <LinearGradient
-        colors={["#f78ca0", "#fbc2eb"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={[styles.header, { paddingVertical: top }]}
-      >
-        <Text style={styles.greeting}>
-          {user?.name || user?.email?.split("@")[0]} 💗{" "}
-          {partner?.name || partner?.email?.split("@")[0]}
-        </Text>
-      </LinearGradient>
-
-      {/* Features Section */}
-      <View style={styles.features}>
-        {features.map((f: any, i) => (
-          <TouchableOpacity
-            key={i}
-            style={[
-              styles.card,
-              {
-                backgroundColor:
-                  gradientCardColors[i % gradientCardColors.length],
-              },
-            ]}
-            onPress={() => router.push(f.route)}
-            activeOpacity={0.9}
-          >
-            <View style={styles.icon}>
-              <Ionicons name={f.icon} size={28} color="#ec4899" />
+      <ScrollView contentContainerStyle={styles.homeContent} showsVerticalScrollIndicator={false}>
+        <LinearGradient colors={["#a65f65", "#bd8078"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.header, { paddingTop: Math.max(top, 14) + 8 }]}>
+          <View style={styles.headerTopline}>
+            <View><Text style={styles.headerEyebrow}>YOUR SPACE FOR TWO</Text><Text style={styles.headerTitle}>Growing together</Text></View>
+            <View style={styles.headerActions}>
+              <View style={styles.pairedPill}><Ionicons name="heart" size={13} color="#fffdfa" /><Text style={styles.pairedPillText}>Connected</Text></View>
+              <TouchableOpacity style={styles.headerSettings} onPress={() => router.push("/(tabs)/Settings")} accessibilityLabel="Open settings">
+                <Ionicons name="settings-outline" size={20} color="#fffdfa" />
+              </TouchableOpacity>
             </View>
-            <Text style={styles.cardText}>{f.title}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-    </View>
+          </View>
+          <View style={styles.coupleRow}>
+            <View style={[styles.coupleAvatar, { backgroundColor: "#f0dfdc" }]}><Text style={[styles.avatarInitial, { color: "#a65f65" }]}>{userName.charAt(0).toUpperCase()}</Text></View>
+            <View style={styles.coupleHeart}><Ionicons name="heart" size={16} color="#fffdfa" /></View>
+            <View style={[styles.coupleAvatar, { backgroundColor: "#e8eee7" }]}><Text style={[styles.avatarInitial, { color: "#6d8777" }]}>{partnerName.charAt(0).toUpperCase()}</Text></View>
+            <View style={styles.coupleNames}><Text style={styles.namesTitle}>{userName} & {partnerName}</Text><Text style={styles.namesSubtitle}>Your private couple space</Text></View>
+          </View>
+        </LinearGradient>
+
+        <View style={styles.pointsCard}>
+          <View style={styles.pointsIcon}><Ionicons name="heart" size={21} color="#a65f65" /></View>
+          <View style={styles.pointsCopy}><Text style={styles.pointsLabel}>Love points</Text><Text style={styles.pointsHint}>Every thoughtful message counts</Text></View>
+          <Text style={styles.pointsValue}>{user.score || 0}</Text>
+        </View>
+
+        <View style={styles.sectionHeading}><View><Text style={styles.sectionTitle}>Your shared space</Text><Text style={styles.sectionSubtitle}>Little ways to stay connected</Text></View><Ionicons name="leaf-outline" size={21} color="#6d8777" /></View>
+        <View style={styles.features}>
+          {features.map((feature) => (
+            <TouchableOpacity key={feature.title} style={styles.featureCard} onPress={() => router.push(feature.route as never)} activeOpacity={0.82}>
+              <View style={[styles.featureIcon, { backgroundColor: feature.tint }]}><Ionicons name={feature.icon} size={23} color="#73585a" /></View>
+              <View style={styles.featureCopy}><Text style={styles.featureTitle}>{feature.title}</Text><Text style={styles.featureSubtitle}>{feature.subtitle}</Text></View>
+              <Ionicons name="chevron-forward" size={18} color="#a69a8f" />
+            </TouchableOpacity>
+          ))}
+        </View>
+        <View style={styles.footerNote}><Ionicons name="lock-closed-outline" size={14} color="#6d8777" /><Text style={styles.footerNoteText}>Your shared space is just for the two of you.</Text></View>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
+
+const Step = ({ number, label }: { number: string; label: string }) => (
+  <View style={styles.step}><View style={styles.stepNumber}><Text style={styles.stepNumberText}>{number}</Text></View><Text style={styles.stepLabel}>{label}</Text></View>
+);
 
 export default HomeScreen;
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
-  center: { flex: 1, justifyContent: "center", alignItems: "center" },
-  header: {
-    paddingHorizontal: 20,
-    borderBottomLeftRadius: 40,
-    borderBottomRightRadius: 40,
-    shadowColor: "#ec4899",
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 5 },
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  greeting: { fontSize: 24, fontWeight: "bold", color: "#ffffff" },
-  partnerName: { fontSize: 18, color: "#ffe4f0", marginTop: 10 },
-  features: {
-    paddingHorizontal: 20,
-    paddingTop: 30,
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-  },
-  card: {
-    width: "47%",
-    padding: 20,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 20,
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 5 },
-    transform: [{ scale: 1 }],
-  },
-  icon: {
-    backgroundColor: "#ffffff",
-    borderRadius: 40,
-    padding: 16,
-    shadowColor: "#ec4899",
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 3 },
-    marginBottom: 10,
-  },
-  cardText: { color: "#ec4899", fontWeight: "bold", fontSize: 16 },
-  bottomGradient: {
-    height: 100,
-    marginTop: "auto",
-    borderTopLeftRadius: 40,
-    borderTopRightRadius: 40,
-    shadowColor: "#ec4899",
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: -5 },
-  },
+  loadingScreen: { flex: 1, backgroundColor: "#f7f2eb", alignItems: "center", justifyContent: "center" },
+  container: { flex: 1, backgroundColor: "#f7f2eb" },
+  onboardingContent: { flexGrow: 1, paddingHorizontal: 25, paddingTop: 36, paddingBottom: 30, justifyContent: "center" },
+  brandMark: { width: 58, height: 58, borderRadius: 20, alignItems: "center", justifyContent: "center", backgroundColor: "#f0dfdc", alignSelf: "center", marginBottom: 22 },
+  onboardingTop: { position: "relative", alignItems: "center", alignSelf: "stretch" },
+  onboardingSettings: { position: "absolute", right: 0, top: 0, width: 43, height: 43, borderRadius: 15, backgroundColor: "#fffdfa", borderWidth: 1, borderColor: "#e9dfd3", alignItems: "center", justifyContent: "center" },
+  eyebrow: { color: "#8a7770", letterSpacing: 2, fontSize: 10, fontWeight: "800", textAlign: "center" },
+  onboardingTitle: { color: "#3f3832", fontSize: 29, fontWeight: "800", lineHeight: 36, textAlign: "center", marginTop: 12 },
+  onboardingCopy: { color: "#82766d", fontSize: 15, lineHeight: 23, textAlign: "center", marginTop: 12 },
+  previewCard: { backgroundColor: "#fffdfa", borderColor: "#e9dfd3", borderWidth: 1, borderRadius: 23, alignItems: "center", padding: 22, marginTop: 27, marginBottom: 20 },
+  avatarRow: { flexDirection: "row", alignItems: "center", marginBottom: 15 },
+  avatar: { width: 54, height: 54, borderRadius: 27, alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: "#fffdfa" },
+  avatarRose: { backgroundColor: "#f0dfdc" }, avatarSage: { backgroundColor: "#e8eee7" },
+  connectionLine: { width: 37, height: 37, borderRadius: 19, alignItems: "center", justifyContent: "center", backgroundColor: "#fffdfa", zIndex: 1, marginHorizontal: -5 },
+  previewTitle: { color: "#4a413a", fontSize: 16, fontWeight: "700", textAlign: "center" },
+  previewCopy: { color: "#82766d", fontSize: 13, lineHeight: 19, textAlign: "center", marginTop: 5 },
+  primaryButton: { minHeight: 54, borderRadius: 16, backgroundColor: "#a65f65", paddingHorizontal: 17, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10 },
+  primaryButtonText: { flex: 1, color: "#fffdfa", fontSize: 15, fontWeight: "700" },
+  secondaryButton: { minHeight: 48, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 7 },
+  secondaryButtonText: { color: "#5d7666", fontSize: 14, fontWeight: "600" },
+  stepsRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", marginTop: 27 },
+  step: { alignItems: "center", gap: 6 }, stepNumber: { width: 25, height: 25, borderRadius: 13, backgroundColor: "#e8eee7", alignItems: "center", justifyContent: "center" },
+  stepNumberText: { color: "#5d7666", fontSize: 12, fontWeight: "700" }, stepLabel: { color: "#82766d", fontSize: 10 }, stepDivider: { width: 27, height: 1, backgroundColor: "#d9cec2", marginHorizontal: 8, marginBottom: 16 },
+  homeContent: { paddingBottom: 28 },
+  header: { paddingHorizontal: 22, paddingBottom: 23, borderBottomLeftRadius: 30, borderBottomRightRadius: 30 },
+  headerTopline: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
+  headerActions: { flexDirection: "row", alignItems: "center", gap: 8 },
+  headerEyebrow: { color: "#f4ddda", fontSize: 10, fontWeight: "700", letterSpacing: 1.5 },
+  headerTitle: { color: "#fffdfa", fontSize: 25, fontWeight: "800", marginTop: 4 },
+  pairedPill: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "#ffffff2b", borderRadius: 20, paddingHorizontal: 10, paddingVertical: 7 },
+  pairedPillText: { color: "#fffdfa", fontSize: 11, fontWeight: "700" },
+  headerSettings: { width: 34, height: 34, borderRadius: 12, backgroundColor: "#ffffff26", alignItems: "center", justifyContent: "center" },
+  coupleRow: { flexDirection: "row", alignItems: "center", marginTop: 21 },
+  coupleAvatar: { width: 47, height: 47, borderRadius: 24, alignItems: "center", justifyContent: "center", borderColor: "#ffffff88", borderWidth: 2 },
+  avatarInitial: { fontSize: 18, fontWeight: "800" },
+  coupleHeart: { width: 27, height: 27, borderRadius: 14, backgroundColor: "#bd8078", alignItems: "center", justifyContent: "center", marginHorizontal: -5, zIndex: 1 },
+  coupleNames: { marginLeft: 12 }, namesTitle: { color: "#fffdfa", fontSize: 15, fontWeight: "700" }, namesSubtitle: { color: "#f4ddda", fontSize: 11, marginTop: 3 },
+  pointsCard: { marginHorizontal: 20, marginTop: 17, backgroundColor: "#fffdfa", borderColor: "#e9dfd3", borderWidth: 1, borderRadius: 17, paddingHorizontal: 14, paddingVertical: 12, flexDirection: "row", alignItems: "center" },
+  pointsIcon: { width: 40, height: 40, borderRadius: 14, backgroundColor: "#f0dfdc", alignItems: "center", justifyContent: "center" },
+  pointsCopy: { flex: 1, marginLeft: 11 }, pointsLabel: { color: "#4a413a", fontSize: 14, fontWeight: "700" }, pointsHint: { color: "#82766d", fontSize: 11, marginTop: 3 }, pointsValue: { color: "#a65f65", fontSize: 23, fontWeight: "800" },
+  sectionHeading: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginHorizontal: 22, marginTop: 26, marginBottom: 11 },
+  sectionTitle: { color: "#3f3832", fontSize: 18, fontWeight: "800" }, sectionSubtitle: { color: "#82766d", fontSize: 12, marginTop: 3 },
+  features: { marginHorizontal: 18 },
+  featureCard: { minHeight: 71, borderRadius: 17, borderWidth: 1, borderColor: "#ece2d8", backgroundColor: "#fffdfa", flexDirection: "row", alignItems: "center", paddingHorizontal: 12, marginBottom: 9 },
+  featureIcon: { width: 44, height: 44, borderRadius: 15, alignItems: "center", justifyContent: "center" },
+  featureCopy: { flex: 1, marginLeft: 12 }, featureTitle: { color: "#4a413a", fontSize: 14, fontWeight: "700" }, featureSubtitle: { color: "#8a7e73", fontSize: 11, marginTop: 3 },
+  footerNote: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 8 }, footerNoteText: { color: "#82766d", fontSize: 11 },
 });

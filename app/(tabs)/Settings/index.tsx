@@ -1,29 +1,27 @@
-import { useAppDispatch, useAppSelector } from "@/hooks/use-redux";
+﻿import { useAppDispatch, useAppSelector } from "@/hooks/use-redux";
 import { useToast } from "@/providers/toast-provider";
 import { setQuote } from "@/redux/slices/quotes-slice";
 import { setPartner, setUser } from "@/redux/slices/user-slice";
-import { auth, db } from "@/utils/firebase";
-import { unPairUsers } from "@/utils/firebase-functions/unpair-req";
-import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { getActiveCouple, getCurrentProfile, supabase, unpairUsers } from "@/utils/supabase";
+import Ionicons from "react-native-vector-icons/Ionicons";
+import { LinearGradient } from "react-native-linear-gradient";
+import { useRouter } from "@/navigation/router-compat";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   Image,
-  Linking,
   RefreshControl,
-  SafeAreaView,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import ScreenBackButton from "@/components/ScreenBackButton";
 
 const SettingsScreen = () => {
   const router = useRouter();
@@ -34,27 +32,32 @@ const SettingsScreen = () => {
     displayName: "",
     bio: "",
   });
-  const [avatar, setAvatar] = useState(null);
+  const [avatar, setAvatar] = useState<string | null>(null);
   const [isPremium, setIsPremium] = useState(false);
   const { toast } = useToast();
   const { top } = useSafeAreaInsets();
   const dispatch = useAppDispatch();
 
   const fetchUserData = async () => {
-    if (auth.currentUser) {
-      const userDoc = await getDoc(doc(db, "users", auth.currentUser.uid));
-      if (userDoc.exists()) {
-        const userData = userDoc.data();
-        dispatch(setUser(userData));
-        setIsPremium(userData?.isPremium || false);
+    try {
+      const userData = await getCurrentProfile();
+      if (userData) {
+        const [couple, { data: entitlement }] = await Promise.all([
+          getActiveCouple(userData.id),
+          supabase.from("entitlements").select("active").eq("user_id", userData.id).maybeSingle(),
+        ]);
+        const paid = !!entitlement?.active;
+        dispatch(setUser({ ...userData, id: userData.id, paid, partnerId: couple?.partner.id || "", isPaired: !!couple, coupleId: couple?.id } as any));
+        dispatch(setPartner(couple ? { ...couple.partner, photoURL: couple.partner.photo_path, partnerId: userData.id, isPaired: true, coupleId: couple.id } as any : null));
+        setIsPremium(paid);
         setFormData({
           displayName: userData.name || "",
           bio: userData.bio || "",
         });
-        setAvatar(userData.photoURL || null);
+        setAvatar(userData.photo_path || null);
       }
-      setLoading(false);
-    }
+    } catch (error) { console.warn("Could not load profile", error); }
+    finally { setLoading(false); }
   };
 
   useEffect(() => {
@@ -69,18 +72,15 @@ const SettingsScreen = () => {
   const handleUpdateProfile = async () => {
     try {
       setLoading(true);
-      await updateDoc(doc(db, "users", auth.currentUser?.uid || ""), {
-        name: formData.displayName,
-        bio: formData.bio,
-        ...(typeof avatar === "string" && { photoURL: avatar }),
-      });
+      const authUser = await supabase.auth.getUser();
+      if (!authUser.data.user) throw new Error("Please sign in again.");
+      const { error } = await supabase.from("profiles").update({
+        name: formData.displayName, bio: formData.bio,
+        ...(typeof avatar === "string" && { photo_path: avatar }),
+      }).eq("id", authUser.data.user.id);
+      if (error) throw error;
       setEditing(false);
-      const userDoc = await getDoc(
-        doc(db, "users", auth.currentUser?.uid || "")
-      );
-      if (userDoc.exists()) {
-        setUser(userDoc.data());
-      }
+      await fetchUserData();
     } catch (error) {
       console.error("Error updating profile:", error);
     } finally {
@@ -88,12 +88,14 @@ const SettingsScreen = () => {
     }
   };
 
-  const handleUnpair = async () => {
+  const confirmUnpair = async () => {
     try {
       setLoading(true);
-      await unPairUsers();
+      await unpairUsers();
+      dispatch(setUser({ ...user, partnerId: "", isPaired: false, coupleId: undefined } as any));
       toast("Successfully unpaired!");
       dispatch(setPartner(null));
+      router.replace("/(tabs)/Home");
     } catch (error: any) {
       toast(`Unpairing failed: ${error.message}`);
     } finally {
@@ -101,53 +103,48 @@ const SettingsScreen = () => {
     }
   };
 
-  const handleUpgrade = () => {
-    // For manual payment flow
+  const handleUnpair = () => {
     Alert.alert(
-      "Upgrade to Premium",
-      "Please contact support@lovequotes.com to upgrade your account manually.",
+      "Unpair from your partner?",
+      "Your shared space will close for both of you. Messages and shared history stay private and return if you reconnect.",
       [
-        {
-          text: "Cancel",
-          style: "cancel",
-        },
-        {
-          text: "Contact Support",
-          onPress: () => Linking.openURL("mailto:support@lovequotes.com"),
-        },
-      ]
+        { text: "Keep paired", style: "cancel" },
+        { text: "Unpair", style: "destructive", onPress: () => { void confirmUnpair(); } },
+      ],
     );
   };
 
   if (loading) {
     return (
-      <SafeAreaView style={[styles.container, styles.loadingContainer]}>
-        <ActivityIndicator size="large" color="#ec4899" />
+      <SafeAreaView style={[styles.container, styles.loadingContainer]} edges={["left", "right", "bottom"]}>
+        <ActivityIndicator size="large" color="#a65f65" />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["left", "right", "bottom"]}>
+      <StatusBar barStyle="light-content" />
       <ScrollView
         contentContainerStyle={styles.scrollContainer}
         refreshControl={
           <RefreshControl
             refreshing={loading}
             onRefresh={onRefresh}
-            colors={["#ec4899"]}
-            tintColor="#ec4899"
+            colors={["#a65f65"]}
+            tintColor="#a65f65"
             progressBackgroundColor="#ffffff"
           />
         }
       >
         {/* Header with pink background */}
         <LinearGradient
-          colors={["#f78ca0", "#fbc2eb"]}
+          colors={["#a65f65", "#c8877a"]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={[styles.header, { paddingVertical: top }]}
         >
+          <ScreenBackButton label="Home" light />
           <Text style={styles.greeting}>
             {user?.name || user?.email?.split("@")[0]}
           </Text>
@@ -159,12 +156,7 @@ const SettingsScreen = () => {
             {avatar ? (
               <Image source={{ uri: avatar }} style={styles.avatar} />
             ) : (
-              <Ionicons name="person-circle" size={100} color="#9ca3af" />
-            )}
-            {editing && (
-              <TouchableOpacity style={styles.editBadge}>
-                <Ionicons name="camera" size={20} color="white" />
-              </TouchableOpacity>
+              <Ionicons name="person-circle" size={100} color="#9a8e83" />
             )}
           </View>
 
@@ -173,7 +165,7 @@ const SettingsScreen = () => {
               <TextInput
                 style={styles.input}
                 placeholder="Display Name"
-                placeholderTextColor="#9ca3af"
+                placeholderTextColor="#9a8e83"
                 value={formData.displayName}
                 onChangeText={(text) =>
                   setFormData({ ...formData, displayName: text })
@@ -182,7 +174,7 @@ const SettingsScreen = () => {
               <TextInput
                 style={[styles.input, styles.bioInput]}
                 placeholder="Bio"
-                placeholderTextColor="#9ca3af"
+                placeholderTextColor="#9a8e83"
                 multiline
                 numberOfLines={3}
                 value={formData.bio}
@@ -192,10 +184,10 @@ const SettingsScreen = () => {
           ) : (
             <View style={styles.infoContainer}>
               <Text style={styles.displayName}>
-                {formData.displayName || auth.currentUser?.email}
+                {formData.displayName || user?.email}
               </Text>
               {user?.bio ? <Text style={styles.bio}>{user.bio}</Text> : null}
-              <Text style={styles.email}>{auth.currentUser?.email}</Text>
+              <Text style={styles.email}>{user?.email}</Text>
               {isPremium && (
                 <View style={styles.premiumBadge}>
                   <Ionicons name="star" size={16} color="#f59e0b" />
@@ -241,51 +233,37 @@ const SettingsScreen = () => {
 
           {user?.isPaired && (
             <TouchableOpacity
-              style={[styles.button, styles.unpairButton]}
+              style={styles.unpairButton}
               onPress={handleUnpair}
               disabled={loading}
             >
-              <Text style={styles.buttonText}>Unpair Account</Text>
+              <Ionicons name="heart-dislike-outline" size={19} color="#a65f65" />
+              <View style={styles.unpairCopy}><Text style={styles.unpairTitle}>Unpair from your partner</Text><Text style={styles.unpairSubtitle}>Your shared space will close for both of you.</Text></View>
+              <Ionicons name="chevron-forward" size={18} color="#a69a8f" />
             </TouchableOpacity>
           )}
         </View>
 
         {/* Premium Subscription Section */}
-        {!user?.paid && (
+        {
           <View style={styles.card}>
             <View style={styles.premiumHeader}>
-              <Ionicons name="diamond" size={24} color="#f59e0b" />
-              <Text style={styles.sectionTitle}>Go Premium</Text>
+              <Ionicons name={isPremium ? "heart" : "sparkles"} size={24} color="#a65f65" />
+              <Text style={styles.sectionTitle}>{isPremium ? "Membership active" : "A little extra support"}</Text>
             </View>
             <Text style={styles.premiumDescription}>
-              Unlock all features including unlimited quotes, premium content,
-              and more!
+              {isPremium
+                ? "Your picture quizzes and relationship guide are ready whenever you need them."
+                : "Keep using the app as usual, or add picture quizzes and the optional relationship guide with a membership."}
             </Text>
-            <View style={styles.premiumFeatures}>
-              <View style={styles.featureItem}>
-                <Ionicons name="checkmark-circle" size={18} color="#10b981" />
-                <Text style={styles.featureText}>Unlimited Quotes</Text>
-              </View>
-              <View style={styles.featureItem}>
-                <Ionicons name="checkmark-circle" size={18} color="#10b981" />
-                <Text style={styles.featureText}>Exclusive Content</Text>
-              </View>
-              <View style={styles.featureItem}>
-                <Ionicons name="checkmark-circle" size={18} color="#10b981" />
-                <Text style={styles.featureText}>No Ads</Text>
-              </View>
-            </View>
             <TouchableOpacity
               style={[styles.button, styles.premiumButton]}
               onPress={() => router.push("/(tabs)/Settings/Payment")}
             >
-              <Text style={styles.buttonText}>Upgrade Now - $4.99/month</Text>
+              <Text style={styles.buttonText}>{isPremium ? "Manage membership" : "Explore membership"}</Text>
             </TouchableOpacity>
-            <Text style={styles.noteText}>
-              * Contact support for manual payment options
-            </Text>
           </View>
-        )}
+        }
 
         {/* Legal Section */}
         <View style={styles.card}>
@@ -294,7 +272,7 @@ const SettingsScreen = () => {
             style={styles.legalItem}
             onPress={() => router.push("/(tabs)/Settings/PrivacyPolicy")}
           >
-            <Ionicons name="lock-closed" size={20} color="#64748b" />
+            <Ionicons name="lock-closed" size={20} color="#82766d" />
             <Text style={styles.legalText}>Privacy Policy</Text>
             <Ionicons
               name="chevron-forward"
@@ -308,7 +286,7 @@ const SettingsScreen = () => {
             style={styles.legalItem}
             onPress={() => router.push("/(tabs)/Settings/TermsCondition")}
           >
-            <Ionicons name="document-text" size={20} color="#64748b" />
+            <Ionicons name="document-text" size={20} color="#82766d" />
             <Text style={styles.legalText}>Terms & Conditions</Text>
             <Ionicons
               name="chevron-forward"
@@ -340,7 +318,7 @@ const SettingsScreen = () => {
             dispatch(setPartner(null));
             dispatch(setUser(null));
             dispatch(setQuote(null));
-            auth.signOut();
+            void supabase.auth.signOut();
             router.replace("/login");
           }}
         >
@@ -354,7 +332,7 @@ const SettingsScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: "#f7f2eb",
   },
   greeting: { fontSize: 24, fontWeight: "bold", color: "#ffffff" },
   loadingContainer: {
@@ -368,8 +346,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderBottomLeftRadius: 40,
     borderBottomRightRadius: 40,
-    shadowColor: "#ec4899",
-    shadowOpacity: 0.3,
+    shadowColor: "#795856",
+    shadowOpacity: 0.16,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 5 },
     alignItems: "center",
@@ -395,29 +373,18 @@ const styles = StyleSheet.create({
     height: 100,
     borderRadius: 50,
   },
-  editBadge: {
-    position: "absolute",
-    bottom: 0,
-    right: 0,
-    backgroundColor: "#ec4899",
-    borderRadius: 15,
-    width: 30,
-    height: 30,
-    justifyContent: "center",
-    alignItems: "center",
-  },
   formContainer: {
     width: "100%",
   },
   input: {
-    backgroundColor: "#f9fafb",
+    backgroundColor: "#fffdfa",
     padding: 15,
     borderRadius: 12,
     marginBottom: 15,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: "#e9dfd3",
     fontSize: 16,
-    color: "#475569",
+    color: "#4a413a",
   },
   bioInput: {
     height: 100,
@@ -429,39 +396,39 @@ const styles = StyleSheet.create({
   displayName: {
     fontSize: 22,
     fontWeight: "600",
-    color: "#475569",
+    color: "#4a413a",
     marginBottom: 5,
     textAlign: "center",
   },
   bio: {
     fontSize: 16,
-    color: "#64748b",
+    color: "#82766d",
     textAlign: "center",
     marginBottom: 10,
     paddingHorizontal: 20,
   },
   email: {
     fontSize: 14,
-    color: "#94a3b8",
+    color: "#a39488",
     textAlign: "center",
   },
   premiumBadge: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#fef3c7",
+    backgroundColor: "#f3e8d2",
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
     marginTop: 8,
   },
   premiumText: {
-    color: "#92400e",
+    color: "#765f43",
     fontSize: 14,
     fontWeight: "600",
     marginLeft: 4,
   },
   card: {
-    backgroundColor: "#f9fafb",
+    backgroundColor: "#fffdfa",
     marginHorizontal: 20,
     borderRadius: 15,
     padding: 20,
@@ -474,7 +441,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#475569",
+    color: "#4a413a",
     marginBottom: 15,
   },
   premiumHeader: {
@@ -483,7 +450,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   premiumDescription: {
-    color: "#64748b",
+    color: "#82766d",
     marginBottom: 15,
     lineHeight: 22,
   },
@@ -496,12 +463,12 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   featureText: {
-    color: "#475569",
+    color: "#4a413a",
     marginLeft: 8,
   },
   noteText: {
     fontSize: 12,
-    color: "#94a3b8",
+    color: "#a39488",
     textAlign: "center",
     marginTop: 10,
   },
@@ -518,29 +485,41 @@ const styles = StyleSheet.create({
     flexDirection: "row",
   },
   editButton: {
-    backgroundColor: "#ec4899",
+    backgroundColor: "#a65f65",
   },
   unpairButton: {
-    backgroundColor: "#f87171",
+    minHeight: 58,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 11,
+    backgroundColor: "#fcf5f2",
+    borderWidth: 1,
+    borderColor: "#ecd5d1",
+    borderRadius: 14,
+    paddingHorizontal: 13,
+    marginTop: 14,
   },
+  unpairCopy: { flex: 1 },
+  unpairTitle: { color: "#8d5354", fontSize: 13, fontWeight: "700" },
+  unpairSubtitle: { color: "#8a7f75", fontSize: 10, lineHeight: 15, marginTop: 2 },
   premiumButton: {
-    backgroundColor: "#f59e0b",
+    backgroundColor: "#6d8777",
   },
   logoutButton: {
-    backgroundColor: "#f9fafb",
+    backgroundColor: "#fffdfa",
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: "#e9dfd3",
     marginHorizontal: 20,
   },
   saveButton: {
-    backgroundColor: "#ec4899",
+    backgroundColor: "#a65f65",
     marginRight: 10,
     flex: 1,
   },
   cancelButton: {
-    backgroundColor: "#f9fafb",
+    backgroundColor: "#fffdfa",
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: "#e9dfd3",
     flex: 1,
   },
   editActions: {
@@ -554,12 +533,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   cancelButtonText: {
-    color: "#475569",
+    color: "#4a413a",
     fontWeight: "600",
     fontSize: 16,
   },
   logoutButtonText: {
-    color: "#475569",
+    color: "#4a413a",
     fontWeight: "600",
     fontSize: 16,
   },
@@ -570,7 +549,7 @@ const styles = StyleSheet.create({
   },
   legalText: {
     flex: 1,
-    color: "#475569",
+    color: "#4a413a",
     marginLeft: 12,
     fontSize: 16,
   },
@@ -579,7 +558,7 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    backgroundColor: "#e2e8f0",
+    backgroundColor: "#e9dfd3",
     marginVertical: 4,
   },
   infoItem: {
@@ -588,10 +567,10 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   infoLabel: {
-    color: "#64748b",
+    color: "#82766d",
   },
   infoValue: {
-    color: "#475569",
+    color: "#4a413a",
     fontWeight: "500",
   },
 });

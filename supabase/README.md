@@ -1,0 +1,34 @@
+# Supabase setup
+
+1. Copy the project URL and publishable/anon key into a local `.env` using `.env.example` as the template.
+2. Apply the migrations with `npx supabase db push` after linking the CLI to the project.
+3. Enable email/password authentication and configure email-confirmation redirects.
+4. Configure a RevenueCat project with an entitlement named `premium`, monthly and annual store products, and a current offering containing monthly and yearly packages. Use the Supabase Auth UUID as the RevenueCat app user ID.
+5. Add the RevenueCat Apple and Google public SDK keys to `.env`, configure the RevenueCat webhook to call `/functions/v1/revenuecat-webhook`, and set its Bearer secret as `REVENUECAT_WEBHOOK_SECRET` in Supabase Functions secrets.
+6. Set provider credentials as Supabase Function secrets, never in the mobile app's `.env` file:
+
+   ```sh
+   npx supabase secrets set AI_CHAT_COMPLETIONS_URL="https://YOUR_PROVIDER/v1/chat/completions" AI_PROVIDER_API_KEY="YOUR_SERVER_SIDE_KEY" AI_PROVIDER_MODEL="YOUR_MODEL" REVENUECAT_WEBHOOK_SECRET="YOUR_WEBHOOK_SECRET"
+   ```
+
+   The AI function uses an OpenAI-compatible chat-completions endpoint, so you can choose the provider later.
+7. Deploy the two Edge Functions:
+
+   ```sh
+   npx supabase functions deploy relationship-coach
+   npx supabase functions deploy revenuecat-webhook --no-verify-jwt
+   ```
+
+8. Build and install the native iOS/Android app before testing store purchases. Store billing is unavailable in simulators without configured store test accounts.
+
+The app uses separate `messages` rows with server-generated UUIDs. A message insert is independent from other inserts, so simultaneous sends do not replace one another. The database trigger increments the sender's score atomically. The app subscribes to changes for the active couple and initially loads the latest 200 rows.
+
+Migration `202610280003_reconnect_previous_couple.sql` reactivates the most recent ended couple when those exact two accounts pair again. Since messages and other shared records stay attached to that couple ID, their prior conversation and shared history return. Couple data and private media are readable only while the pairing is active. This applies to data already stored in Supabase; Firebase records still need a separate import.
+
+Paid access is granted only from RevenueCat webhooks into `entitlements`; the client cannot mark an account paid. Quiz image uploads and quiz creation are checked against the active server entitlement. The relationship coach checks the caller's entitlement and requires both partners to opt in. Each request sends the couple's bios, the user's question, and up to 30 recent shared messages to the configured AI provider; prompts and answers are not stored by the app.
+
+## Existing Firebase data
+
+This migration creates the new schema; it does not copy production Firebase records or Firebase Auth accounts. Before switching real users, export Firestore collections and Storage objects, map old Firebase UIDs to new Supabase Auth UUIDs, transform embedded message/memory/quiz arrays into rows, and validate counts and ownership. Firebase password hashes cannot simply be copied into Supabase Auth through this app; plan an account relinking or password reset flow. Keep the existing Firebase project available until the export and cutover are verified.
+
+The old Firebase project settings are preserved in `utils/legacy-firebase-config.json` for the legacy export/cutover period. New app screens use Supabase.

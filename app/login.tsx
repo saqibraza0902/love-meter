@@ -1,8 +1,7 @@
-import { useToast } from "@/providers/toast-provider";
+﻿import { useToast } from "@/providers/toast-provider";
 import { handleApiError } from "@/utils/handle-api-errors";
-import MaterialIcons from "@expo/vector-icons/MaterialIcons";
-import { useRouter } from "expo-router";
-import { signInWithEmailAndPassword } from "firebase/auth";
+import MaterialIcons from "react-native-vector-icons/MaterialIcons";
+import { useRouter } from "@/navigation/router-compat";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
@@ -13,7 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { auth } from "../utils/firebase";
+import { supabase } from "../utils/supabase";
 
 const LoginScreen = () => {
   const [email, setEmail] = useState("");
@@ -35,8 +34,8 @@ const LoginScreen = () => {
     }
     try {
       setIsLoading(true);
-      await signInWithEmailAndPassword(auth, email, password);
-      router.replace("/(tabs)/Home");
+      const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+      if (error) throw error;
     } catch (error: any) {
       const err = handleApiError(error);
       toast(err);
@@ -52,25 +51,25 @@ const LoginScreen = () => {
 
       <View style={styles.inputContainer}>
         <View style={styles.inputWrapper}>
-          <MaterialIcons name="mail" size={20} color="#9ca3af" />
+          <MaterialIcons name="mail" size={20} color="#9a8e83" />
           <TextInput
             placeholder="Email"
             value={email}
             keyboardType="email-address"
             onChangeText={setEmail}
             style={styles.input}
-            placeholderTextColor="#9ca3af"
+            placeholderTextColor="#9a8e83"
           />
         </View>
         <View style={styles.inputWrapper}>
-          <MaterialIcons name="lock" size={20} color="#9ca3af" />
+          <MaterialIcons name="lock" size={20} color="#9a8e83" />
           <TextInput
             placeholder="Password"
             value={password}
             onChangeText={setPassword}
             style={styles.input}
             secureTextEntry={!isPasswordVisible}
-            placeholderTextColor="#9ca3af"
+            placeholderTextColor="#9a8e83"
           />
           <TouchableOpacity
             onPress={() => setIsPasswordVisible((prev) => !prev)}
@@ -78,7 +77,7 @@ const LoginScreen = () => {
             <MaterialIcons
               name={isPasswordVisible ? "visibility" : "visibility-off"}
               size={20}
-              color="#9ca3af"
+              color="#9a8e83"
             />
           </TouchableOpacity>
         </View>
@@ -100,7 +99,7 @@ const LoginScreen = () => {
           style={styles.signupContainer}
         >
           <Text style={styles.signupText}>
-            Don’t have an account?{" "}
+            Donâ€™t have an account?{" "}
             <Text style={styles.signupLink}>Sign Up</Text>
           </Text>
         </TouchableOpacity>
@@ -118,20 +117,20 @@ export default LoginScreen;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: "#f7f2eb",
     paddingHorizontal: 30,
     justifyContent: "center",
   },
   title: {
     fontSize: 24,
     fontWeight: "bold",
-    color: "#ec4899",
+    color: "#a65f65",
     textAlign: "center",
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: "#475569",
+    color: "#4a413a",
     textAlign: "center",
     marginBottom: 30,
   },
@@ -141,9 +140,9 @@ const styles = StyleSheet.create({
   inputWrapper: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#f9fafb",
+    backgroundColor: "#fffdfa",
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: "#e9dfd3",
     paddingHorizontal: 12,
     borderRadius: 12,
     height: 50,
@@ -152,17 +151,17 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 16,
-    color: "#475569",
+    color: "#4a413a",
   },
   loginButton: {
-    backgroundColor: "#ec4899",
+    backgroundColor: "#a65f65",
     paddingVertical: 15,
     borderRadius: 12,
     alignItems: "center",
     marginTop: 10,
   },
   loginButtonDisabled: {
-    backgroundColor: "#d1d5db", // Tailwind gray-300
+    backgroundColor: "#c8bdb2",
   },
   loginButtonText: {
     color: "#fff",
@@ -174,11 +173,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   signupText: {
-    color: "#475569",
+    color: "#4a413a",
     fontSize: 14,
   },
   signupLink: {
-    color: "#ec4899",
+    color: "#a65f65",
     fontWeight: "600",
   },
   errorText: {

@@ -1,8 +1,7 @@
-import { useAppSelector } from "@/hooks/use-redux";
+﻿import { useAppSelector } from "@/hooks/use-redux";
 import { useToast } from "@/providers/toast-provider";
-import { db } from "@/utils/firebase";
+import { getMediaUrl, supabase } from "@/utils/supabase";
 import { useRoute } from "@react-navigation/native";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -14,6 +13,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import ScreenBackButton from "@/components/ScreenBackButton";
 
 const QuizDetail = () => {
   const { params } = useRoute();
@@ -33,25 +33,54 @@ const QuizDetail = () => {
     const get_quiz = async () => {
       try {
         setLoading(true);
-        const docRef = doc(db, "quizzes", id);
-        const docSnap = await getDoc(docRef);
-
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          setQuizData(data);
-          setSubmitted(data.status || false);
-
-          const isUserCreator = data.creatorId === user?.id;
-          const isUserPartner = data.users.some(
-            (el: string) => el === user?.id
-          );
-          console.log(isPartner);
-          setIsCreator(isUserCreator);
-          setIsPartner(isUserPartner);
-          setAuthorized(isUserCreator || isUserPartner);
-        } else {
-          toast("Not Found , Quiz does not exist.");
+        const { data, error } = await supabase.from("quizzes")
+          .select("id,name,creator_id,couple_id,quiz_questions(id,question,position,quiz_options(id,text,image_path,position))")
+          .eq("id", id).single();
+        if (error) throw error;
+        const isUserCreator = data.creator_id === user?.id;
+        const isUserPartner = data.couple_id === user?.coupleId && !isUserCreator;
+        setIsCreator(isUserCreator);
+        setIsPartner(isUserPartner);
+        setAuthorized(isUserCreator || isUserPartner);
+        let answersByQuestion = new Map<string, string>();
+        let attemptId: string | null = null;
+        let wasSubmitted = false;
+        const attemptUserId = isUserCreator ? partner?.id : user?.id;
+        if ((isUserPartner || isUserCreator) && attemptUserId) {
+          const { data: attempt, error: attemptError } = await supabase.from("quiz_attempts")
+            .select("id,submitted_at,quiz_answers(question_id,option_id)")
+            .eq("quiz_id", id).eq("user_id", attemptUserId).maybeSingle();
+          if (attemptError) throw attemptError;
+          if (attempt) {
+            attemptId = attempt.id;
+            wasSubmitted = !!attempt.submitted_at;
+            answersByQuestion = new Map((attempt.quiz_answers || []).map((answer: any) => [answer.question_id, answer.option_id]));
+          }
         }
+        const keyResult = isUserCreator ? await supabase.from("quiz_answer_keys").select("question_id,correct_option_id") : { data: [], error: null };
+        if (keyResult.error) throw keyResult.error;
+        const keys = new Map((keyResult.data || []).map((key: any) => [key.question_id, key.correct_option_id]));
+        const questions = await Promise.all((data.quiz_questions || []).sort((a: any, b: any) => a.position - b.position).map(async (question: any) => {
+          const options = await Promise.all((question.quiz_options || []).sort((a: any, b: any) => a.position - b.position).map(async (option: any) => ({
+            ...option, image: option.image_path ? await getMediaUrl(option.image_path) : undefined,
+          })));
+          const correctId = keys.get(question.id);
+          return {
+            ...question, options,
+            correctIndex: correctId ? options.findIndex((option: any) => option.id === correctId) : undefined,
+            userAnswer: answersByQuestion.has(question.id) ? options.findIndex((option: any) => option.id === answersByQuestion.get(question.id)) : undefined,
+          };
+        }));
+        if (isUserPartner && wasSubmitted && attemptId) {
+          const { data: results, error: resultsError } = await supabase.rpc("get_quiz_results", { target_attempt: attemptId });
+          if (resultsError) throw resultsError;
+          for (const question of questions) {
+            const result: any = results.find((row: any) => row.question_id === question.id);
+            if (result) question.correctIndex = result.correct_option_position;
+          }
+        }
+        setQuizData({ id: data.id, name: data.name, questions });
+        setSubmitted(wasSubmitted);
       } catch (error) {
         console.error(error);
         toast("Error, Failed to fetch quiz.");
@@ -89,12 +118,12 @@ const QuizDetail = () => {
     }
 
     try {
-      const quizRef = doc(db, "quizzes", id);
-      await updateDoc(quizRef, {
-        questions: quizData.questions,
-        status: true,
-        submittedAt: new Date(),
-      });
+      const answers = quizData.questions.map((question: any) => ({
+        question_id: question.id,
+        option_id: question.options[question.userAnswer].id,
+      }));
+      const { error } = await supabase.rpc("submit_quiz", { target_quiz: id, submitted_answers: answers });
+      if (error) throw error;
 
       setSubmitted(true);
       toast("Success,Quiz submitted successfully!");
@@ -109,7 +138,7 @@ const QuizDetail = () => {
       <SafeAreaView
         style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
       >
-        <ActivityIndicator size="large" color="#ec4899" />
+        <ActivityIndicator size="large" color="#a65f65" />
       </SafeAreaView>
     );
   }
@@ -128,6 +157,7 @@ const QuizDetail = () => {
 
   return (
     <SafeAreaView style={{ flex: 1, padding: 16 }}>
+      <ScreenBackButton label="Quizzes" />
       <Text style={styles.title}>{quizData?.name}</Text>
       <Text style={styles.status}>
         Status: {submitted ? "Submitted" : "Not Submitted"}
@@ -212,15 +242,15 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "bold",
     marginBottom: 8,
-    color: "#ec4899",
+    color: "#a65f65",
   },
   status: {
     fontSize: 16,
-    color: "#6b7280",
+    color: "#82766d",
     marginBottom: 16,
   },
   questionItem: {
-    backgroundColor: "#fdf2f8", // soft pink background
+    backgroundColor: "#fcf5f2", // soft pink background
     padding: 16,
     borderRadius: 12,
     marginBottom: 20,
@@ -231,26 +261,26 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     marginBottom: 12,
-    color: "#111827",
+    color: "#3f3832",
   },
   optionsContainer: {
     marginTop: 8,
   },
   optionButton: {
-    backgroundColor: "#fce7f3",
+    backgroundColor: "#f0dfdc",
     padding: 14,
     borderRadius: 10,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: "#f9a8d4",
+    borderColor: "#e2c5c1",
   },
   selectedOption: {
     backgroundColor: "#fbcfe8",
-    borderColor: "#ec4899",
+    borderColor: "#a65f65",
   },
   correctOption: {
-    backgroundColor: "#d1fae5", // light green
-    borderColor: "#10b981",
+    backgroundColor: "#e8eee7", // light green
+    borderColor: "#6d8777",
   },
   wrongOption: {
     backgroundColor: "#fee2e2",
@@ -258,7 +288,7 @@ const styles = StyleSheet.create({
   },
   optionText: {
     fontSize: 15,
-    color: "#1f2937",
+    color: "#3f3832",
   },
   feedbackText: {
     marginTop: 10,
@@ -266,13 +296,13 @@ const styles = StyleSheet.create({
     fontStyle: "italic",
   },
   correctFeedback: {
-    color: "#10b981",
+    color: "#6d8777",
   },
   wrongFeedback: {
     color: "#ef4444",
   },
   submitButton: {
-    backgroundColor: "#ec4899",
+    backgroundColor: "#a65f65",
     padding: 16,
     borderRadius: 10,
     alignItems: "center",

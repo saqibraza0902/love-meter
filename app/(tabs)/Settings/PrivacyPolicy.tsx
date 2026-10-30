@@ -1,10 +1,12 @@
-import React from "react";
+﻿import React from "react";
 import { SafeAreaView, ScrollView, Text, View, StyleSheet } from "react-native";
+import ScreenBackButton from "@/components/ScreenBackButton";
 
 const PrivacyPolicy = () => {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scroll}>
+        <View style={{ paddingHorizontal: 20 }}><ScreenBackButton label="Settings" /></View>
         <View style={styles.header}>
           <Text style={styles.title}>Privacy Policy</Text>
         </View>
@@ -34,7 +36,12 @@ const PrivacyPolicy = () => {
             unauthorized access.
           </Text>
 
-          <Text style={styles.sectionTitle}>5. Changes</Text>
+          <Text style={styles.sectionTitle}>5. Optional AI relationship help</Text>
+          <Text style={styles.text}>
+            The relationship guide is optional. It will only receive your question, both partnersâ€™ profile bios, and up to 30 recent shared messages after both partners have opted in. You can withdraw your consent in the guide at any time. Questions and answers are not saved to your app account; the configured AI provider processes the request to generate a response, and its own privacy and retention terms also apply.
+          </Text>
+
+          <Text style={styles.sectionTitle}>6. Changes</Text>
           <Text style={styles.text}>
             We may update this policy. Changes will be posted in the app.
           </Text>
@@ -54,11 +61,11 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: "bold",
-    color: "#ec4899",
+    color: "#a65f65",
     textAlign: "center",
   },
   card: {
-    backgroundColor: "#f9fafb",
+    backgroundColor: "#fffdfa",
     marginHorizontal: 20,
     borderRadius: 15,
     padding: 20,
@@ -70,12 +77,12 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#475569",
+    color: "#4a413a",
     marginTop: 15,
   },
   text: {
     fontSize: 16,
-    color: "#64748b",
+    color: "#82766d",
     marginTop: 8,
     lineHeight: 22,
   },

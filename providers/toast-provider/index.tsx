@@ -1,5 +1,5 @@
 // toast-context.tsx
-import React, { createContext, useContext, useRef, useState } from "react";
+import React, { createContext, useCallback, useContext, useRef, useState } from "react";
 import { Animated, Dimensions, StyleSheet, Text } from "react-native";
 
 const ToastContext = createContext<{
@@ -11,7 +11,7 @@ export const ToastProvider = ({ children }: { children: React.ReactNode }) => {
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(50)).current;
 
-  const toast = (msg: string, duration = 2000) => {
+  const toast = useCallback((msg: string, duration = 2000) => {
     setMessage(msg);
 
     Animated.parallel([
@@ -41,7 +41,7 @@ export const ToastProvider = ({ children }: { children: React.ReactNode }) => {
         ]).start();
       }, duration);
     });
-  };
+  }, [opacity, translateY]);
 
   return (
     <ToastContext.Provider value={{ toast }}>
