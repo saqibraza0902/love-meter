@@ -4,10 +4,12 @@ import { supabase, uploadImage } from "@/utils/supabase";
 import Feather from "react-native-vector-icons/Feather";
 import { useNavigation } from "@react-navigation/native";
 import * as ImagePicker from "@/utils/image-picker-compat";
-import { useRouter } from "@/navigation/router-compat";
+import { useLocalSearchParams, useRouter } from "@/navigation/router-compat";
 import React, { useState } from "react";
 import {
   Image,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -17,6 +19,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import ScreenBackButton from "@/components/ScreenBackButton";
+import { QUIZ_STARTERS } from "@/constants/quiz-starters";
 
 type Option = {
   text: string;
@@ -32,9 +35,15 @@ type Question = {
 const CreateQuiz = () => {
   const { toast } = useToast();
   const router = useRouter();
-  const [quizName, setQuizName] = useState("");
+  const { template } = useLocalSearchParams<{ template?: string }>();
+  const starter = QUIZ_STARTERS.find(item => item.id === template);
+  const [quizName, setQuizName] = useState(starter?.name || "");
 
-  const [questions, setQuestions] = useState<Question[]>([
+  const [questions, setQuestions] = useState<Question[]>(starter ? starter.questions.map(question => ({
+    question,
+    options: starter.options.map(text => ({ text })),
+    correctIndex: null,
+  })) : [
     {
       question: "",
       options: [{ text: "" }, { text: "" }, { text: "" }, { text: "" }],
@@ -172,7 +181,7 @@ const CreateQuiz = () => {
           (q) =>
             q.question.trim() !== "" &&
             q.options.every((opt) => opt.text.trim() !== "" || opt.image) &&
-            q.correctIndex !== null
+            (!!starter || q.correctIndex !== null)
         );
 
       if (!partner?.id || !isValid) {
@@ -188,11 +197,9 @@ const CreateQuiz = () => {
           ...(option.image ? { image_path: await uploadImage(option.image, `${user.coupleId}/quizzes/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`) } : {}),
         }))),
       })));
-      const { error } = await supabase.rpc("create_quiz", {
-        target_couple: user.coupleId,
-        quiz_name: quizName.trim(),
-        quiz_questions: cleanedQuestions,
-      });
+      const { error } = starter
+        ? await supabase.rpc("create_conversation_quiz", { target_couple: user.coupleId, quiz_name: quizName.trim(), quiz_questions: cleanedQuestions })
+        : await supabase.rpc("create_quiz", { target_couple: user.coupleId, quiz_name: quizName.trim(), quiz_questions: cleanedQuestions });
       if (error) throw error;
 
       toast("Quiz created successfully");
@@ -204,8 +211,6 @@ const CreateQuiz = () => {
   };
 
   const renderOptionInput = (qIndex: number, optIndex: number, opt: Option) => {
-    const isPaidUser = user?.paid === true;
-
     return (
       <View style={styles.optionRow}>
         <View style={styles.optionContent}>
@@ -216,14 +221,12 @@ const CreateQuiz = () => {
           {opt.image ? (
             <View style={styles.imageContainer}>
               <Image source={{ uri: opt.image }} style={styles.optionImage} />
-              {isPaidUser && (
-                <TouchableOpacity
-                  style={styles.removeImageButton}
-                  onPress={() => removeImage(qIndex, optIndex)}
-                >
-                  <Feather name="x" size={16} color="#ef4444" />
-                </TouchableOpacity>
-              )}
+              <TouchableOpacity
+                style={styles.removeImageButton}
+                onPress={() => removeImage(qIndex, optIndex)}
+              >
+                <Feather name="x" size={16} color="#ef4444" />
+              </TouchableOpacity>
             </View>
           ) : (
             <>
@@ -236,14 +239,12 @@ const CreateQuiz = () => {
                 placeholder={`Enter option ${optIndex + 1}`}
                 placeholderTextColor="#9a8e83"
               />
-              {isPaidUser && (
-                <TouchableOpacity
-                  style={styles.uploadImageButton}
-                  onPress={() => pickImage(qIndex, optIndex)}
-                >
-                  <Feather name="image" size={18} color="#6d8777" />
-                </TouchableOpacity>
-              )}
+              <TouchableOpacity
+                style={styles.uploadImageButton}
+                onPress={() => pickImage(qIndex, optIndex)}
+              >
+                <Feather name="image" size={18} color="#6d8777" />
+              </TouchableOpacity>
             </>
           )}
         </View>
@@ -270,8 +271,10 @@ const CreateQuiz = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+      <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive">
         <ScreenBackButton label="Quizzes" />
+        {starter && <View style={styles.conversationHint}><Feather name="message-circle" size={18} color="#6d8777" /><Text style={styles.conversationHintText}>This is a no-score conversation deck. Your partner answers from your choices, and you can compare what they picked.</Text></View>}
         {/* Quiz Name Input */}
         <View style={styles.quizNameContainer}>
           <Text style={styles.sectionTitle}>Quiz Name</Text>
@@ -344,6 +347,7 @@ const CreateQuiz = () => {
           </TouchableOpacity>
         )}
       </ScrollView>
+      </KeyboardAvoidingView>
 
       <View style={styles.footer}>
         <TouchableOpacity style={styles.saveBtn} onPress={saveQuiz}>
@@ -363,6 +367,8 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingBottom: 100,
   },
+  conversationHint: { flexDirection: "row", alignItems: "flex-start", gap: 9, backgroundColor: "#e8eee7", borderRadius: 14, padding: 12, marginBottom: 16 },
+  conversationHintText: { flex: 1, color: "#536b59", fontSize: 12, lineHeight: 17 },
   quizNameContainer: {
     marginBottom: 25,
     backgroundColor: "#fff",

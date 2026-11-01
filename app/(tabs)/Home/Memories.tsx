@@ -9,11 +9,13 @@ import {
   ActivityIndicator,
   FlatList,
   Image,
+  KeyboardAvoidingView,
   Modal,
   Pressable,
   ScrollView,
   StyleSheet,
   StatusBar,
+  Platform,
   Text,
   TextInput,
   TouchableOpacity,
@@ -94,14 +96,17 @@ const CalendarScreen = () => {
     }
   };
 
-  const saveMemory = async () => {
-    if (!memoryText || !memoryImage) {
-      return toast("Please select an image and write a memory!");
+  const takePhoto = async () => {
+    try {
+      const result = await ImagePicker.launchCameraAsync({ quality: 0.75 });
+      if (!result.canceled && result.assets.length > 0) setMemoryImage(result.assets[0].uri || null);
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "Couldn't open the camera.");
     }
+  };
 
-    if (memoryText.split(" ").length > 20) {
-      return toast("Please limit your memory to 20 words.");
-    }
+  const saveMemory = async () => {
+    if (!memoryImage) return toast("Add a photo to save this memory.");
 
     try {
       setUploading(true);
@@ -138,8 +143,9 @@ const CalendarScreen = () => {
           <View style={styles.headerTextContainer}>
             <Text style={styles.headerTitle}>Memory Lane</Text>
             <Text style={styles.headerSubtitle}>
-              Cherish your moments together
+              A little photo journal of your life together
             </Text>
+            <Text style={styles.memoryCount}>{memories?.memories?.length || 0} shared moment{memories?.memories?.length === 1 ? "" : "s"}</Text>
           </View>
 
           <View style={styles.coupleContainer}>
@@ -175,10 +181,11 @@ const CalendarScreen = () => {
         <FlatList
           data={memories?.memories}
           contentContainerStyle={styles.listContent}
+          numColumns={2}
           showsVerticalScrollIndicator={false}
-          keyExtractor={(item, index) => index.toString()}
+          keyExtractor={(item, index) => `${item.date}-${index}`}
           renderItem={({ item, index }) => (
-            <View style={styles.memoryCard}>
+            <View style={[styles.memoryCard, index % 2 === 0 ? styles.memoryCardLeft : styles.memoryCardRight]}>
               <TouchableOpacity
                 onPress={() => {
                   setSelectedImageUri(item.image);
@@ -190,7 +197,7 @@ const CalendarScreen = () => {
                   style={styles.memoryImage}
                 />
               </TouchableOpacity>
-              <Text style={styles.memoryDate}>{item.date}</Text>
+              <Text style={styles.memoryDate}>{new Date(`${item.date}T12:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</Text>
               <Text style={styles.memoryText}>{item.text}</Text>
             </View>
           )}
@@ -245,6 +252,7 @@ const CalendarScreen = () => {
               <Calendar
                 current={new Date().toISOString().split("T")[0]}
                 onDayPress={handleDayPress}
+                markedDates={Object.fromEntries((memories?.memories || []).map((memory: any) => [memory.date, { marked: true, dotColor: "#a65f65" }]))}
                 theme={{
                   selectedDayBackgroundColor: "#a65f65",
                   todayTextColor: "#a65f65",
@@ -270,7 +278,8 @@ const CalendarScreen = () => {
       </Modal>
 
       {/* Add Memory Modal */}
-      <Modal visible={modalVisible} transparent animationType="slide">
+      <Modal visible={modalVisible} transparent animationType="slide" onRequestClose={() => setModalVisible(false)}>
+        <KeyboardAvoidingView style={styles.keyboardAvoid} behavior={Platform.OS === "ios" ? "padding" : "height"}>
         <View style={styles.modalBackdrop}>
           <LinearGradient
             colors={["#fcf5f2", "#f0dfdc"]}
@@ -282,19 +291,23 @@ const CalendarScreen = () => {
             >
               <Text style={styles.modalTitle}>Memory for {selectedDate}</Text>
 
-              <TouchableOpacity onPress={pickImage} style={styles.imagePicker}>
+              <TouchableOpacity onPress={takePhoto} style={styles.imagePicker}>
                 {memoryImage ? (
                   <Image source={{ uri: memoryImage }} style={styles.image} />
                 ) : (
                   <View style={styles.imagePlaceholder}>
                     <Ionicons name="image-outline" size={48} color="#e2c5c1" />
-                    <Text style={styles.placeholderText}>Select Image</Text>
+                    <Text style={styles.placeholderText}>Take a photo</Text>
                   </View>
                 )}
               </TouchableOpacity>
+              <TouchableOpacity onPress={pickImage} style={styles.libraryButton}>
+                <Ionicons name="images-outline" size={18} color="#6d8777" />
+                <Text style={styles.libraryButtonText}>Choose from photo library</Text>
+              </TouchableOpacity>
 
               <TextInput
-                placeholder="Write a short memory (20 words max)"
+                placeholder="Add a caption or a little story (optional)"
                 placeholderTextColor="#9a8e83"
                 value={memoryText}
                 onChangeText={setMemoryText}
@@ -350,6 +363,7 @@ const CalendarScreen = () => {
             </ScrollView>
           </LinearGradient>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
     </LinearGradient>
   );
@@ -395,6 +409,7 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.9)",
     fontWeight: "500",
   },
+  memoryCount: { color: "#fff", fontSize: 11, fontWeight: "700", marginTop: 9, opacity: 0.9 },
   coupleContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -448,44 +463,44 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 24,
     paddingBottom: 100,
+    flexGrow: 1,
   },
   memoryCard: {
     backgroundColor: "#fffdfa",
     borderWidth: 1,
     borderColor: "#e9dfd3",
-    padding: 20,
-    marginBottom: 20,
-    borderRadius: 24,
+    padding: 10,
+    marginBottom: 12,
+    borderRadius: 19,
     shadowColor: "#000",
     shadowOpacity: 0.1,
     shadowOffset: { width: 0, height: 4 },
     shadowRadius: 8,
-    elevation: 3,
+    elevation: 2,
+    flex: 1,
   },
   memoryImage: {
     width: "100%",
-    height: 220,
-    borderRadius: 16,
-    marginBottom: 12,
+    height: 155,
+    borderRadius: 13,
+    marginBottom: 9,
     resizeMode: "cover",
   },
   memoryDate: {
-    fontSize: 16,
+    fontSize: 12,
     fontWeight: "700",
     color: "#a65f65",
     marginBottom: 8,
-    textShadowColor: "rgba(0,0,0,0.2)",
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
+    textShadowColor: "transparent",
   },
   memoryText: {
-    fontSize: 15,
+    fontSize: 13,
     color: "#4a413a",
     lineHeight: 22,
-    textShadowColor: "rgba(0,0,0,0.1)",
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 1,
+    textShadowColor: "transparent",
   },
+  memoryCardLeft: { marginRight: 6 },
+  memoryCardRight: { marginLeft: 6 },
   addButton: {
     position: "absolute",
     bottom: 30,
@@ -593,6 +608,9 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     elevation: 3,
   },
+  libraryButton: { minHeight: 45, marginBottom: 16, borderRadius: 13, backgroundColor: "#e8eee7", alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 7 },
+  libraryButtonText: { color: "#5d7666", fontWeight: "700", fontSize: 13 },
+  keyboardAvoid: { flex: 1, justifyContent: "center" },
   image: {
     width: "100%",
     height: "100%",

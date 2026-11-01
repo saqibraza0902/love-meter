@@ -14,6 +14,7 @@ export interface IUser {
   score: number;
   coupleId?: string;
   ai_consent_at?: string | null;
+  time_zone?: string;
 }
 
 export interface IQuotes {

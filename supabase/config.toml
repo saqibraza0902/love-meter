@@ -7,6 +7,9 @@ project_id = "love-meter"
 [functions.revenuecat-webhook]
 verify_jwt = false
 
+[functions.expire-daily-snaps]
+verify_jwt = true
+
 [api]
 enabled = true
 # Port to use for the API URL.

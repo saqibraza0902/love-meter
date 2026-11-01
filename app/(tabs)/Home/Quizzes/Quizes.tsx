@@ -4,6 +4,7 @@ import { supabase } from "@/utils/supabase";
 import { useRouter } from "@/navigation/router-compat";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import ScreenBackButton from "@/components/ScreenBackButton";
+import { QUIZ_STARTERS } from "@/constants/quiz-starters";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -97,6 +98,31 @@ const QuizzesScreen = () => {
         <Text style={styles.heading}>Your quizzes</Text>
       </View>
 
+      <TouchableOpacity style={styles.createQuizButton} onPress={() => router.push("/(tabs)/Home/Quizzes/CreateQuiz")}>
+        <View style={styles.createQuizIcon}><Ionicons name="add" size={22} color="#fffdfa" /></View>
+        <View style={{ flex: 1 }}><Text style={styles.createQuizTitle}>Create your own quiz</Text><Text style={styles.createQuizCopy}>Start from scratch or pick a ready-made deck below.</Text></View>
+        <Ionicons name="arrow-forward" size={18} color="#a65f65" />
+      </TouchableOpacity>
+
+      <View style={styles.starterBlock}>
+        <Text style={styles.starterHeading}>Ready-made quiz decks</Text>
+        <Text style={styles.starterCopy}>10 themes · 20 questions each · customize before sending</Text>
+        <FlatList
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          data={QUIZ_STARTERS}
+          keyExtractor={item => item.id}
+          renderItem={({ item }) => (
+            <TouchableOpacity style={styles.starterCard} onPress={() => router.push({ pathname: "/(tabs)/Home/Quizzes/CreateQuiz", params: { template: item.id } })}>
+              <Ionicons name={item.icon as any} size={19} color="#a65f65" />
+              <Text style={styles.starterTitle}>{item.name}</Text>
+              <Text style={styles.starterQuestionCount}>{item.questions.length} questions</Text>
+              <Text style={styles.starterAction}>Open deck →</Text>
+            </TouchableOpacity>
+          )}
+        />
+      </View>
+
       {loading ? (
         <View style={styles.loaderContainer}>
           <ActivityIndicator size="large" color="#a65f65" />
@@ -117,14 +143,6 @@ const QuizzesScreen = () => {
         />
       )}
 
-      <TouchableOpacity
-        style={[styles.button, loading && styles.disabledButton]}
-        onPress={() => router.push("/(tabs)/Home/Quizzes/CreateQuiz")}
-        disabled={loading}
-      >
-        <Ionicons name="add-circle-outline" size={20} color="#fffdfa" />
-        <Text style={styles.buttonText}>{quizzes.length ? "Create a quiz" : "Create your first quiz"}</Text>
-      </TouchableOpacity>
     </SafeAreaView>
   );
 };
@@ -141,6 +159,17 @@ const styles = StyleSheet.create({
     color: "#3f3832",
   },
   headingRow: { marginBottom: 2 },
+  starterBlock: { marginBottom: 14 },
+  starterHeading: { color: "#4a413a", fontSize: 15, fontWeight: "700", marginBottom: 4 },
+  starterCopy: { color: "#82766d", fontSize: 11, lineHeight: 16, marginBottom: 9 },
+  starterCard: { width: 174, minHeight: 132, backgroundColor: "#fffdfa", borderRadius: 17, borderWidth: 1, borderColor: "#e9dfd3", padding: 13, marginRight: 9, justifyContent: "space-between" },
+  starterTitle: { color: "#4a413a", fontSize: 12, lineHeight: 16, fontWeight: "700", marginTop: 5 },
+  starterQuestionCount: { color: "#82766d", fontSize: 10, marginTop: 4 },
+  starterAction: { color: "#a65f65", fontSize: 10, fontWeight: "700", marginTop: 7 },
+  createQuizButton: { minHeight: 74, borderRadius: 18, backgroundColor: "#f0dfdc", padding: 13, marginBottom: 16, flexDirection: "row", alignItems: "center", gap: 11 },
+  createQuizIcon: { width: 42, height: 42, borderRadius: 15, backgroundColor: "#a65f65", alignItems: "center", justifyContent: "center" },
+  createQuizTitle: { color: "#4a413a", fontSize: 14, fontWeight: "800" },
+  createQuizCopy: { color: "#82766d", fontSize: 10, lineHeight: 14, marginTop: 3 },
   button: {
     backgroundColor: "#a65f65",
     padding: 16,

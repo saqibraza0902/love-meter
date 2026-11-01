@@ -9,6 +9,8 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import * as ImagePicker from "@/utils/image-picker-compat";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -91,7 +93,8 @@ const AddTTDT = () => {
 
   return (
     <SafeAreaView style={{ flex: 1 }}>
-      <ScrollView contentContainerStyle={styles.container}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
         <ScreenBackButton label="Back to ideas" />
         <Text style={styles.title}>Add New TTDT</Text>
 
@@ -150,6 +153,7 @@ const AddTTDT = () => {
           )}
         </TouchableOpacity>
       </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };

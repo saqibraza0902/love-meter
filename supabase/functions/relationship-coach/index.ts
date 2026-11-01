@@ -34,11 +34,8 @@ Deno.serve(async (request) => {
       .select("couple_id").eq("user_id", user.id).is("left_at", null).maybeSingle();
     if (membershipError || !membership) return json({ error: "Pair your account before using relationship help." }, 403);
 
-    const [{ data: entitlement, error: entitlementError }, { data: members, error: membersError }] = await Promise.all([
-      client.from("entitlements").select("active").eq("user_id", user.id).maybeSingle(),
-      client.from("couple_members").select("user_id").eq("couple_id", membership.couple_id).is("left_at", null),
-    ]);
-    if (entitlementError || !entitlement?.active) return json({ error: "An active Love Meter membership is required." }, 402);
+    const { data: members, error: membersError } = await client.from("couple_members")
+      .select("user_id").eq("couple_id", membership.couple_id).is("left_at", null);
     if (membersError || !members || members.length !== 2) return json({ error: "Your active couple could not be loaded." }, 403);
 
     const memberIds = members.map((member) => member.user_id);

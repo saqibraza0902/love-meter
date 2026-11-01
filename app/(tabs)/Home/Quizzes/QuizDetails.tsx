@@ -28,16 +28,18 @@ const QuizDetail = () => {
   const [isCreator, setIsCreator] = useState(false);
   const [isPartner, setIsPartner] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [quizMode, setQuizMode] = useState<"scored" | "conversation">("scored");
 
   useEffect(() => {
     const get_quiz = async () => {
       try {
         setLoading(true);
         const { data, error } = await supabase.from("quizzes")
-          .select("id,name,creator_id,couple_id,quiz_questions(id,question,position,quiz_options(id,text,image_path,position))")
+          .select("id,name,creator_id,couple_id,quiz_mode,quiz_questions(id,question,position,quiz_options(id,text,image_path,position))")
           .eq("id", id).single();
         if (error) throw error;
         const isUserCreator = data.creator_id === user?.id;
+        setQuizMode(data.quiz_mode === "conversation" ? "conversation" : "scored");
         const isUserPartner = data.couple_id === user?.coupleId && !isUserCreator;
         setIsCreator(isUserCreator);
         setIsPartner(isUserPartner);
@@ -160,7 +162,7 @@ const QuizDetail = () => {
       <ScreenBackButton label="Quizzes" />
       <Text style={styles.title}>{quizData?.name}</Text>
       <Text style={styles.status}>
-        Status: {submitted ? "Submitted" : "Not Submitted"}
+        {quizMode === "conversation" ? "A no-score conversation deck · your answers are shared with the creator" : `Status: ${submitted ? "Submitted" : "Not Submitted"}`}
       </Text>
 
       <ScrollView style={{ marginTop: 20 }}>
@@ -206,7 +208,10 @@ const QuizDetail = () => {
               )}
             </View>
 
-            {submitted && (
+            {submitted && quizMode === "conversation" && (
+              <Text style={styles.correctFeedback}>Thanks for sharing your answer.</Text>
+            )}
+            {submitted && quizMode === "scored" && (
               <Text
                 style={[
                   styles.feedbackText,

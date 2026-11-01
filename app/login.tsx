@@ -6,6 +6,8 @@ import React, { useState } from "react";
 import {
   ActivityIndicator,
   Keyboard,
+  KeyboardAvoidingView,
+  Platform,
   StyleSheet,
   Text,
   TextInput,
@@ -45,7 +47,7 @@ const LoginScreen = () => {
   };
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === "ios" ? "padding" : "height"}>
       <Text style={styles.title}>Welcome Back</Text>
       <Text style={styles.subtitle}>Please log in to continue</Text>
 
@@ -108,7 +110,7 @@ const LoginScreen = () => {
           <Text style={styles.errorText}>{errorMessage}</Text>
         ) : null}
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 };
 

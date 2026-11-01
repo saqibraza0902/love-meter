@@ -11,6 +11,8 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  KeyboardAvoidingView,
+  Platform,
   RefreshControl,
   ScrollView,
   StatusBar,
@@ -125,8 +127,11 @@ const SettingsScreen = () => {
   return (
     <SafeAreaView style={styles.container} edges={["left", "right", "bottom"]}>
       <StatusBar barStyle="light-content" />
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
       <ScrollView
         contentContainerStyle={styles.scrollContainer}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
         refreshControl={
           <RefreshControl
             refreshing={loading}
@@ -188,12 +193,6 @@ const SettingsScreen = () => {
               </Text>
               {user?.bio ? <Text style={styles.bio}>{user.bio}</Text> : null}
               <Text style={styles.email}>{user?.email}</Text>
-              {isPremium && (
-                <View style={styles.premiumBadge}>
-                  <Ionicons name="star" size={16} color="#f59e0b" />
-                  <Text style={styles.premiumText}>Premium Member</Text>
-                </View>
-              )}
             </View>
           )}
         </View>
@@ -244,26 +243,26 @@ const SettingsScreen = () => {
           )}
         </View>
 
-        {/* Premium Subscription Section */}
-        {
+        {/* Optional subscription management and support */}
+        {(
           <View style={styles.card}>
             <View style={styles.premiumHeader}>
               <Ionicons name={isPremium ? "heart" : "sparkles"} size={24} color="#a65f65" />
-              <Text style={styles.sectionTitle}>{isPremium ? "Membership active" : "A little extra support"}</Text>
+              <Text style={styles.sectionTitle}>{isPremium ? "Membership active" : "Support Love Meter"}</Text>
             </View>
             <Text style={styles.premiumDescription}>
               {isPremium
-                ? "Your picture quizzes and relationship guide are ready whenever you need them."
-                : "Keep using the app as usual, or add picture quizzes and the optional relationship guide with a membership."}
+                ? "All features are available to everyone. Manage or cancel your existing subscription here."
+                : "All features are free. An optional membership supports continued development."}
             </Text>
             <TouchableOpacity
               style={[styles.button, styles.premiumButton]}
               onPress={() => router.push("/(tabs)/Settings/Payment")}
             >
-              <Text style={styles.buttonText}>{isPremium ? "Manage membership" : "Explore membership"}</Text>
+              <Text style={styles.buttonText}>{isPremium ? "Manage membership" : "Optional support"}</Text>
             </TouchableOpacity>
           </View>
-        }
+        )}
 
         {/* Legal Section */}
         <View style={styles.card}>
@@ -325,6 +324,7 @@ const SettingsScreen = () => {
           <Text style={styles.logoutButtonText}>Logout</Text>
         </TouchableOpacity>
       </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };

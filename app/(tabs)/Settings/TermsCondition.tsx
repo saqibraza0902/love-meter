@@ -23,9 +23,9 @@ const TermsConditions = () => {
             You may use the app for personal, non-commercial purposes only.
           </Text>
 
-          <Text style={styles.sectionTitle}>Subscription membership</Text>
+          <Text style={styles.sectionTitle}>Features and subscriptions</Text>
           <Text style={styles.text}>
-            Membership is optional and adds image choices in quizzes and access to the relationship guide. Monthly and yearly subscriptions renew through the Apple App Store or Google Play until canceled in your store account. Prices and renewal details are shown by the store before purchase. Messaging, memories, text quizzes, and other core features remain available without membership.
+            All app features, including quiz images and the relationship guide, are available without a paid membership. Any existing store subscription remains managed through your Apple App Store or Google Play account and can be canceled there.
           </Text>
 
           <Text style={styles.sectionTitle}>3. Content</Text>

@@ -36,6 +36,8 @@
 	</dict>
 	<key>NSPhotoLibraryUsageDescription</key>
 <string>Select photos to add shared memories and quiz images.</string>
+<key>NSCameraUsageDescription</key>
+<string>Take a photo to add it to your shared memories.</string>
 <key>NSLocationWhenInUseUsageDescription</key>
 	<string></string>
 	<key>RCTNewArchEnabled</key>

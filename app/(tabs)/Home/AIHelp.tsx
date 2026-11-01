@@ -4,7 +4,7 @@ import { supabase } from "@/utils/supabase";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { useRouter } from "@/navigation/router-compat";
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const AIHelpScreen = () => {
@@ -35,7 +35,17 @@ const AIHelpScreen = () => {
       setAsking(true);
       setAnswer("");
       const { data, error } = await supabase.functions.invoke("relationship-coach", { body: { question: question.trim() } });
-      if (error) throw error;
+      if (error) {
+        let message = error.message || "Relationship help is unavailable right now.";
+        const response = (error as any).context;
+        if (response && typeof response.json === "function") {
+          try {
+            const payload = await response.json();
+            if (payload?.error) message = payload.error;
+          } catch { /* Keep the function client's message when no JSON body is available. */ }
+        }
+        throw new Error(message);
+      }
       if (data?.error) throw new Error(data.error);
       setAnswer(data?.answer || "I couldn't prepare an answer just now. Please try again.");
     } catch (error: any) {
@@ -47,17 +57,13 @@ const AIHelpScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+      <KeyboardAvoidingView style={styles.keyboardAvoid} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive">
         <TouchableOpacity style={styles.back} onPress={() => router.back()}><Ionicons name="arrow-back" size={21} color="#554b43" /><Text style={styles.backText}>Back</Text></TouchableOpacity>
         <View style={styles.heroIcon}><Ionicons name="sparkles" size={27} color="#a65f65" /></View>
         <Text style={styles.title}>A little help, when you need it</Text>
         <Text style={styles.subtitle}>Ask for a thoughtful perspective, a conversation starter, or a small way to reconnect.</Text>
 
-        {!user?.paid ? <View style={styles.membershipCard}>
-          <Text style={styles.cardTitle}>A membership feature</Text>
-          <Text style={styles.body}>The relationship guide is included with membership. Your everyday app features remain free.</Text>
-          <TouchableOpacity style={styles.membershipButton} onPress={() => router.push("/(tabs)/Settings/Payment")}><Text style={styles.membershipButtonText}>See membership options</Text></TouchableOpacity>
-        </View> : <>
           <View style={styles.consentCard}>
             <Text style={styles.cardTitle}>Shared context is optional</Text>
             <Text style={styles.body}>With both partnersâ€™ permission, the guide can use your profile bios and up to 30 recent shared messages to shape its suggestions. It does not save your questions or answers in the app.</Text>
@@ -78,16 +84,17 @@ const AIHelpScreen = () => {
             </View>
             {!!answer && <View style={styles.answerCard}><Text style={styles.answerLabel}>A gentle perspective</Text><Text style={styles.answerText}>{answer}</Text></View>}
           </> : <View style={styles.lockedCard}><Ionicons name="lock-closed" size={18} color="#728778" /><Text style={styles.lockedText}>The guide becomes available after both partners opt in.</Text></View>}
-        </>}
 
         <Text style={styles.disclaimer}>This is general relationship guidance, not therapy or crisis support. If anyone is unsafe, contact a trusted person or local professional support.</Text>
       </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f7f2eb" },
+  keyboardAvoid: { flex: 1 },
   scroll: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 30 },
   back: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 8, alignSelf: "flex-start" },
   backText: { color: "#554b43", fontWeight: "600" },

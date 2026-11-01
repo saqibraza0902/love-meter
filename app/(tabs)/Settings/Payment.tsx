@@ -101,17 +101,17 @@ const PaymentScreen = () => {
         </TouchableOpacity>
         <View style={styles.heroIcon}><Ionicons name="heart" size={27} color="#a65f65" /></View>
         <Text style={styles.title}>{isPremium ? "Your membership" : "Grow closer, together"}</Text>
-        <Text style={styles.subtitle}>Keep the everyday features free. Membership adds a little more support when you need it.</Text>
+        <Text style={styles.subtitle}>Every app feature is free. Membership is an optional way to support continued development.</Text>
 
         <View style={styles.perksCard}>
-          <Text style={styles.perksHeading}>Included with membership</Text>
-          <Perk icon="images-outline" title="Picture quizzes" detail="Add image choices to your couple quizzes." />
-          <Perk icon="sparkles-outline" title="Relationship guide" detail="Get thoughtful ideas grounded in your shared context, when both of you opt in." />
+          <Text style={styles.perksHeading}>Available to everyone</Text>
+          <Perk icon="images-outline" title="Picture quizzes" detail="Add image choices to your couple quizzes for free." />
+          <Perk icon="sparkles-outline" title="Relationship guide" detail="Get thoughtful ideas grounded in shared context, when both of you opt in." />
         </View>
 
         {isPremium ? <View style={styles.memberCard}>
           <Ionicons name="checkmark-circle" size={25} color="#5f806b" />
-          <View style={{ flex: 1, marginLeft: 11 }}><Text style={styles.memberTitle}>Membership active</Text><Text style={styles.memberCopy}>Your extra features are ready.</Text></View>
+          <View style={{ flex: 1, marginLeft: 11 }}><Text style={styles.memberTitle}>Thank you for your support</Text><Text style={styles.memberCopy}>All features are available to everyone.</Text></View>
           <TouchableOpacity onPress={openSubscriptionSettings}><Text style={styles.manageText}>Manage</Text></TouchableOpacity>
         </View> : <>
           <View style={styles.planHeading}><Text style={styles.perksHeading}>Choose your plan</Text><Text style={styles.storeNote}>Prices shown by your store</Text></View>
